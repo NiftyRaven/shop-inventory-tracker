@@ -1,0 +1,11 @@
+node_modules/
+dist/
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm
+admin-password.txt
+admin.json
+.env
+.DS_Store

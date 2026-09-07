@@ -1,0 +1,27 @@
+{
+  "name": "shop-inventory-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shop-floor inventory tracker for material remnants and purchased parts",
+  "type": "module",
+  "scripts": {
+    "dev": "node server/index.js",
+    "build": "vite build",
+    "start": "node server/index.js",
+    "shop": "vite build && node server/index.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "sql.js": "^1.12.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^8.2.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "vite": "^4.5.14"
+  }
+}

@@ -1,0 +1,68 @@
+AG INNOVATION INVENTORY
+=======================
+
+You do not need to type any commands.
+
+START
+-----
+Double-click:
+
+    Start Inventory.bat
+
+Wait. The first time can take a minute. A browser window should open.
+After the PC sleeps or restarts, double-click the same file again.
+Leave the black window open while people use the tracker.
+
+HOME SCREEN
+-----------
+You will see two big tiles:
+
+    Shop floor     — for people at the saw
+    Purchasing     — for people who buy and take parts
+
+Shop floor: Material type → pick the bar → Cut.
+Purchasing: search tags or manufacturer → Take.
+
+The small Admin button is for the trained person only.
+
+SETTINGS PASSWORD
+-----------------
+Admin password starts as:
+
+    free
+
+You may change it once in Settings. After that, edit the file
+admin-password.txt in this folder.
+
+FORMAT
+------
+Format empties the tracker and puts the name back to AG Innovation.
+It makes a zip backup first (in the backups folder). logo.png is not deleted.
+
+CHANGE THE LOGO
+---------------
+In Admin → Settings, tap Change shop logo.
+Or put a picture in this folder named exactly:
+
+    logo.png
+
+Then start the tracker again.
+
+OTHER SHOP COMPUTERS
+--------------------
+Look in the black window for a line like:
+
+    Other shop PCs:  http://192.168.1.40:3000
+
+Open that address in a browser on the other computers.
+
+IF IT SAYS YOU NEED NODE.JS
+---------------------------
+Install the free LTS version from https://nodejs.org
+Then double-click Start Inventory.bat again.
+
+WANT AN ICON ON THE DESKTOP?
+----------------------------
+Double-click:
+
+    Install shortcut on Desktop.bat
