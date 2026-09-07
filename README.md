@@ -12,6 +12,12 @@ One PC. Same screens for the person at the saw, the person who buys the stock, a
 
 It was built first for **AG Innovation** — a real shop, real racks, real jobs. Then it was opened so the next shop does not have to start from zero.
 
+## Get the release
+
+**[Download v1.0.0](https://github.com/NiftyRaven/shop-inventory-tracker/releases/latest)** — unzip, then double-click **`Start Inventory.bat`**. That is the whole install.
+
+Source: [github.com/NiftyRaven/shop-inventory-tracker](https://github.com/NiftyRaven/shop-inventory-tracker)
+
 ## Why it is free
 
 I believe in planting a lot of seeds.

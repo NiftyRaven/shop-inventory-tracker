@@ -2,7 +2,25 @@
   "name": "shop-inventory-tracker",
   "version": "1.0.0",
   "private": true,
-  "description": "Shop-floor inventory tracker for material remnants and purchased parts",
+  "description": "Shop-floor inventory for leftover bars, remnants, and purchased parts. Double-click to run on one PC and share on the LAN.",
+  "license": "MIT",
+  "author": "NiftyRaven / AG Innovation",
+  "homepage": "https://github.com/NiftyRaven/shop-inventory-tracker#readme",
+  "bugs": {
+    "url": "https://github.com/NiftyRaven/shop-inventory-tracker/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NiftyRaven/shop-inventory-tracker.git"
+  },
+  "keywords": [
+    "inventory",
+    "shop-floor",
+    "manufacturing",
+    "materials",
+    "remnants",
+    "purchased-parts"
+  ],
   "type": "module",
   "scripts": {
     "dev": "node server/index.js",
