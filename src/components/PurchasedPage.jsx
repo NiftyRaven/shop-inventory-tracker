@@ -38,9 +38,37 @@ export default function PurchasedPage({ shop }) {
   }, [q]);
 
   const low = useMemo(() => parts.filter((row) => row.low_stock), [parts]);
+  const unitsOnHand = useMemo(
+    () => parts.reduce((sum, row) => sum + (Number(row.quantity_on_hand) || 0), 0),
+    [parts]
+  );
+  const firstRun = parts.length === 0 && !q;
 
   return (
     <section className="page">
+      <div className="page-head">
+        <div>
+          <p className="page-kicker">Bins</p>
+          <h2>Inventory</h2>
+          <p>Bought parts. Add them with cost and markup. Take needs a job number.</p>
+        </div>
+      </div>
+      {parts.length === 0 ? null : (
+        <div className="pulse">
+          <div className="pulse-stat">
+            <div className="meta">Parts</div>
+            <strong>{parts.length}</strong>
+          </div>
+          <div className="pulse-stat">
+            <div className="meta">On hand</div>
+            <strong>{unitsOnHand}</strong>
+          </div>
+          <div className="pulse-stat">
+            <div className="meta">Low stock</div>
+            <strong>{low.length}</strong>
+          </div>
+        </div>
+      )}
       <div className="toolbar">
         <button type="button" className="btn btn-primary btn-xl" onClick={() => setTaking(true)}>
           Take
@@ -50,14 +78,12 @@ export default function PurchasedPage({ shop }) {
         </button>
         <input
           className="search"
+          type="search"
           placeholder="Search tags, manufacturer, part number…"
           value={q}
           onChange={(event) => setQ(event.target.value)}
         />
       </div>
-      <p className="meta" style={{ marginTop: "-8px" }}>
-        Bought parts. Add them with cost and markup. Take needs a job number.
-      </p>
       {error ? <p className="error">{error}</p> : null}
 
       {low.length > 0 ? (
@@ -83,7 +109,27 @@ export default function PurchasedPage({ shop }) {
 
       <div className="table-wrap">
         {parts.length === 0 ? (
-          <div className="empty">No purchased parts yet. Tap Add part to begin.</div>
+          <div className="empty-state">
+            {firstRun ? (
+              <>
+                <h3>No purchased parts yet.</h3>
+                <p>
+                  Add fasteners, 80/20, pneumatics — whatever you buy. Leave markup blank for{" "}
+                  {shop?.defaultMarkup ?? 30}%. Take always needs a job number.
+                </p>
+                <div className="empty-actions">
+                  <button type="button" className="btn btn-primary btn-xl" onClick={() => setAdding(true)}>
+                    Add part
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3>No parts match.</h3>
+                <p>Try a tag, manufacturer, or part number.</p>
+              </>
+            )}
+          </div>
         ) : (
           <table>
             <thead>
@@ -120,13 +166,16 @@ export default function PurchasedPage({ shop }) {
                   <td>{percent(part.unit_markup)}</td>
                   <td>{money(part.unit_charge)}</td>
                   <td>
-                    {qty(part.quantity_on_hand)}
+                    <div className="qty-strong">{qty(part.quantity_on_hand)}</div>
                     {part.reorder_point != null ? (
                       <div className="meta">reorder {qty(part.reorder_point)}</div>
                     ) : null}
                   </td>
                   <td>
                     <div className="row-actions">
+                      <button className="btn btn-primary btn-small" onClick={() => setTaking(part)}>
+                        Take
+                      </button>
                       <button className="btn btn-ok btn-small" onClick={() => setReceiving(part)}>
                         Receive
                       </button>
@@ -171,7 +220,12 @@ export default function PurchasedPage({ shop }) {
       ) : null}
       {taking ? (
         <TakeWizard
+          startPart={taking === true ? null : taking}
           onClose={() => setTaking(false)}
+          onAddPart={() => {
+            setTaking(false);
+            setAdding(true);
+          }}
           onSaved={async () => {
             await load();
           }}
@@ -237,7 +291,7 @@ function PartFormModal({ title, shop, initial, hideQty, onClose, onSubmit }) {
   return (
     <Modal
       title={title}
-      hint="What we paid each, then markup. Leave markup blank for 30%. Tag parts so people can find them."
+      hint={`What we paid each, then markup. Leave markup blank for ${defaultPct}%. Tag parts so people can find them.`}
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -245,7 +299,13 @@ function PartFormModal({ title, shop, initial, hideQty, onClose, onSubmit }) {
         <div className="grid">
           <label className="field">
             <span>Part number</span>
-            <input required value={form.part_number} onChange={(e) => set("part_number", e.target.value)} />
+            <input
+              required
+              autoFocus
+              autoComplete="off"
+              value={form.part_number}
+              onChange={(e) => set("part_number", e.target.value)}
+            />
           </label>
           <label className="field">
             <span>Manufacturer</span>
@@ -347,7 +407,13 @@ function ReceiveModal({ part, onClose, onSaved }) {
         <div className="grid">
           <label className="field wide">
             <span>How many arrived?</span>
-            <input required value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            <input
+              required
+              autoFocus
+              inputMode="decimal"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
           </label>
           <label className="field wide">
             <span>Note (optional)</span>

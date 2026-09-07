@@ -3,12 +3,12 @@ import { api } from "../api.js";
 import { money, parseTagList, previewIssueCharge, qty } from "../format.js";
 import SuccessSplash from "./SuccessSplash.jsx";
 
-export default function TakeWizard({ onClose, onSaved }) {
+export default function TakeWizard({ startPart, onClose, onAddPart, onSaved }) {
   const [parts, setParts] = useState([]);
   const [q, setQ] = useState("");
   const [error, setError] = useState("");
-  const [step, setStep] = useState(1);
-  const [part, setPart] = useState(null);
+  const [step, setStep] = useState(startPart ? 2 : 1);
+  const [part, setPart] = useState(startPart || null);
   const [quantity, setQuantity] = useState("");
   const [job, setJob] = useState("");
   const [note, setNote] = useState("");
@@ -18,6 +18,14 @@ export default function TakeWizard({ onClose, onSaved }) {
   useEffect(() => {
     api.parts().then(setParts).catch((err) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    function onKey(event) {
+      if (event.key === "Escape") onClose?.();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const matches = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -65,7 +73,7 @@ export default function TakeWizard({ onClose, onSaved }) {
               <p className="wizard-kicker">Inventory</p>
               <h2>Take for a job</h2>
               <p className="hint" style={{ marginBottom: 0 }}>
-                Find the part, type the job, then how many.
+                Find the part, type the job number, then how many.
               </p>
             </div>
             <button type="button" className="btn btn-ghost" onClick={onClose}>
@@ -96,13 +104,37 @@ export default function TakeWizard({ onClose, onSaved }) {
           <>
             <input
               className="search wizard-search"
+              type="search"
               autoFocus
               placeholder="Search tags, manufacturer, part number…"
               value={q}
               onChange={(event) => setQ(event.target.value)}
             />
             {matches.length === 0 ? (
-              <div className="empty">No parts match. Try a tag or manufacturer.</div>
+              <div className="empty-state">
+                {parts.length === 0 ? (
+                  <>
+                    <h3>No purchased parts yet.</h3>
+                    <p>Add a part with cost and markup first. Then take it for a job number.</p>
+                    <div className="empty-actions">
+                      {onAddPart ? (
+                        <button type="button" className="btn btn-primary btn-xl" onClick={onAddPart}>
+                          Add part
+                        </button>
+                      ) : (
+                        <button type="button" className="btn btn-ghost" onClick={onClose}>
+                          Close
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3>No parts match.</h3>
+                    <p>Try a tag, manufacturer, or part number.</p>
+                  </>
+                )}
+              </div>
             ) : (
               <div className="choice-list">
                 {matches.map((row) => (
@@ -155,17 +187,20 @@ export default function TakeWizard({ onClose, onSaved }) {
                 <input
                   required
                   autoFocus
+                  autoComplete="off"
                   value={job}
                   onChange={(e) => setJob(e.target.value)}
-                  placeholder="Type the job first"
+                  placeholder="Required — charge goes to this job"
                 />
               </label>
               <label className="field">
                 <span>How many?</span>
                 <input
                   required
+                  inputMode="decimal"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
+                  placeholder={`Up to ${qty(part?.quantity_on_hand)}`}
                 />
               </label>
               <label className="field wide">
@@ -173,7 +208,7 @@ export default function TakeWizard({ onClose, onSaved }) {
                 <input value={note} onChange={(e) => setNote(e.target.value)} />
               </label>
             </div>
-            {job && quantity ? (
+            {job.trim() && quantity ? (
               <p className="wizard-cost-line">
                 Job {job}  ·  Charge to job {money(preview?.charged)}  ·  {qty(quantity)} × {part?.part_number}
               </p>
@@ -184,7 +219,11 @@ export default function TakeWizard({ onClose, onSaved }) {
               <button type="button" className="btn btn-ghost" onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary btn-xl" disabled={busy}>
+              <button
+                type="submit"
+                className="btn btn-primary btn-xl"
+                disabled={busy || !job.trim() || !(Number(quantity) > 0)}
+              >
                 {busy ? "Saving…" : "Take"}
               </button>
             </div>

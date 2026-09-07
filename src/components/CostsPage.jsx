@@ -14,6 +14,12 @@ export default function CostsPage() {
   if (error) {
     return (
       <section className="page">
+        <div className="page-head">
+          <div>
+            <p className="page-kicker">Owner</p>
+            <h2>Costs</h2>
+          </div>
+        </div>
         <p className="error">{error}</p>
       </section>
     );
@@ -21,16 +27,30 @@ export default function CostsPage() {
   if (!report) {
     return (
       <section className="page">
-        <p className="meta">Loading shop numbers…</p>
+        <div className="page-head">
+          <div>
+            <p className="page-kicker">Owner</p>
+            <h2>Costs</h2>
+            <p>Loading shop numbers…</p>
+          </div>
+        </div>
       </section>
     );
   }
 
   const block = range === "week" ? report.week : report.all;
   const leftover = report.leftover;
+  const quiet = leftover === 0 && block.jobs.length === 0 && block.spent === 0 && block.charged === 0;
 
   return (
     <section className="page">
+      <div className="page-head">
+        <div>
+          <p className="page-kicker">Owner</p>
+          <h2>Costs</h2>
+          <p>What you paid, leftover on the rack, charged to jobs, and profit from markup.</p>
+        </div>
+      </div>
       <div className="toolbar">
         <div className="range-toggle">
           <button
@@ -49,9 +69,6 @@ export default function CostsPage() {
           </button>
         </div>
       </div>
-      <p className="hint" style={{ marginTop: 0 }}>
-        What you paid, leftover on the rack, charged to jobs, and profit from markup.
-      </p>
       <div className="stat-grid owner-stats">
         <article className="stat">
           <div className="meta">Paid for stock</div>
@@ -78,7 +95,14 @@ export default function CostsPage() {
       <h2 className="group-title">By job {range === "week" ? "this week" : ""}</h2>
       <div className="table-wrap">
         {block.jobs.length === 0 ? (
-          <div className="empty">No job charges yet. Record a cut or take with a job number.</div>
+          <div className="empty-state">
+            <h3>{quiet ? "No dollars yet. That’s first run." : "No job charges yet."}</h3>
+            <p>
+              {quiet
+                ? "Add stock, then cut or take with a job number. Markup defaults to 30% unless you change it in Settings."
+                : "Record a cut or take with a job number to see paid, markup, and charged here."}
+            </p>
+          </div>
         ) : (
           <table>
             <thead>
@@ -93,7 +117,7 @@ export default function CostsPage() {
               {block.jobs.map((row) => (
                 <tr key={row.job}>
                   <td>
-                    <strong>{row.job}</strong>
+                    <strong className="history-job">{row.job}</strong>
                   </td>
                   <td>{money(row.shop_cost)}</td>
                   <td>{money(row.markup)}</td>

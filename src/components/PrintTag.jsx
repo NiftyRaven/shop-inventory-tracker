@@ -1,6 +1,15 @@
+import { useEffect } from "react";
 import { leftoverInches, qty, rackLetter, remainingSummary } from "../format.js";
 
 export default function PrintTag({ piece, part, onClose }) {
+  useEffect(() => {
+    function onKey(event) {
+      if (event.key === "Escape") onClose?.();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   function printNow() {
     window.print();
   }

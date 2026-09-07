@@ -96,8 +96,37 @@ export default function MaterialsPage({ shop }) {
   const canCut = (piece) =>
     piece.status !== "used_up" && piece.status !== "scrap" && piece.status !== "removed";
 
+  const onRack = pieces.filter((row) => row.status === "in_stock" || row.status === "remnant");
+  const remnantCount = pieces.filter((row) => row.status === "remnant").length;
+  const fullCount = pieces.filter((row) => row.status === "in_stock").length;
+  const filteredEmpty = groups.length === 0;
+  const firstRun = filteredEmpty && !q && !family && !formFilter && status === "available";
+
   return (
     <section className="page">
+      <div className="page-head">
+        <div>
+          <p className="page-kicker">Saw</p>
+          <h2>Materials</h2>
+          <p>Tap a bar to cut it. Job number first, then length. Remnant stays on the rack.</p>
+        </div>
+      </div>
+      {filteredEmpty || (status !== "available" && status !== "") ? null : (
+        <div className="pulse">
+          <div className="pulse-stat">
+            <div className="meta">On the rack</div>
+            <strong>{onRack.length}</strong>
+          </div>
+          <div className="pulse-stat">
+            <div className="meta">Remnants</div>
+            <strong>{remnantCount}</strong>
+          </div>
+          <div className="pulse-stat">
+            <div className="meta">Full stock</div>
+            <strong>{fullCount}</strong>
+          </div>
+        </div>
+      )}
       <div className="toolbar">
         <button type="button" className="btn btn-primary btn-xl" onClick={() => setWizard(true)}>
           Cut
@@ -107,6 +136,7 @@ export default function MaterialsPage({ shop }) {
         </button>
         <input
           className="search"
+          type="search"
           placeholder="Search material, size, rack, job…"
           value={q}
           onChange={(event) => setQ(event.target.value)}
@@ -142,13 +172,47 @@ export default function MaterialsPage({ shop }) {
           </button>
         ))}
       </div>
-      <p className="meta" style={{ marginTop: "-4px" }}>
-        Tap a bar to cut it. Job number first, then length.
-      </p>
       {error ? <p className="error">{error}</p> : null}
-      {groups.length === 0 ? (
+      {filteredEmpty ? (
         <div className="card-list">
-          <div className="empty">Nothing on the rack yet. Tap Add stock to begin.</div>
+          <div className="empty-state">
+            {firstRun ? (
+              <>
+                <h3>Rack is empty. That’s correct.</h3>
+                <p>
+                  First run starts with your shop, not demo leftovers. Add a bar or plate, then cut it to a job
+                  number. Whatever is left stays on the rack as a remnant.
+                </p>
+                <div className="empty-actions">
+                  <button type="button" className="btn btn-primary btn-xl" onClick={() => setAdding(true)}>
+                    Add stock
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3>Nothing matches.</h3>
+                <p>Clear the search or filters, or add a piece to this rack.</p>
+                <div className="empty-actions">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => {
+                      setQ("");
+                      setFamily("");
+                      setFormFilter("");
+                      setStatus("available");
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                  <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
+                    Add stock
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       ) : (
         groups.map(([key, rows]) => (
@@ -159,7 +223,10 @@ export default function MaterialsPage({ shop }) {
             </h2>
             <div className="card-list">
               {rows.map((piece) => (
-                <article className={`piece family-${piece.family}`} key={piece.id}>
+                <article
+                  className={`piece family-${piece.family}${piece.status === "remnant" ? " is-remnant" : ""}`}
+                  key={piece.id}
+                >
                   <div className="rail" />
                   <button
                     type="button"
@@ -220,6 +287,10 @@ export default function MaterialsPage({ shop }) {
         <CutWizard
           startPiece={wizard === true ? null : wizard}
           onClose={() => setWizard(null)}
+          onAddStock={() => {
+            setWizard(null);
+            setAdding(true);
+          }}
           onSaved={afterChange}
         />
       ) : null}
@@ -294,6 +365,19 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
         setBusy(false);
         return;
       }
+      const width = Number(form.width);
+      const length = Number(form.length);
+      if (isPlate) {
+        if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(length) || length <= 0) {
+          setError("Enter width and length so the leftover after a cut stays on the rack.");
+          setBusy(false);
+          return;
+        }
+      } else if (!Number.isFinite(length) || length <= 0) {
+        setError("Enter a stock length so the saw knows what’s on the rack.");
+        setBusy(false);
+        return;
+      }
       const result = await api.addMaterials({ ...form, material });
       onSaved(result.pieces);
     } catch (err) {
@@ -306,7 +390,7 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
   return (
     <Modal
       title="Add stock"
-      hint="What we paid, then markup. Jobs pay cost + markup (30% if you leave markup blank)."
+      hint={`What we paid, then markup. Jobs pay cost + markup (${defaultPct}% if you leave markup blank).`}
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -331,6 +415,7 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
             <span>Material</span>
             <select
               required
+              autoFocus
               value={materialChoice}
               onChange={(e) => pickMaterial(e.target.value)}
             >
@@ -375,7 +460,13 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
           </label>
           <label className="field">
             <span>Width (in)</span>
-            <input value={form.width} onChange={(e) => set("width", e.target.value)} />
+            <input
+              inputMode="decimal"
+              required={isPlate}
+              value={form.width}
+              onChange={(e) => set("width", e.target.value)}
+              placeholder={isPlate ? "Required for plate" : "Optional"}
+            />
           </label>
           {isPlate ? null : (
             <label className="field">
@@ -385,7 +476,13 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
           )}
           <label className="field">
             <span>{isPlate ? "Length (in)" : "Stock length (in)"}</span>
-            <input value={form.length} onChange={(e) => set("length", e.target.value)} />
+            <input
+              required
+              inputMode="decimal"
+              value={form.length}
+              onChange={(e) => set("length", e.target.value)}
+              placeholder={isPlate ? "Plate length" : "Full bar length"}
+            />
           </label>
           <label className="field">
             <span>How many pieces</span>
@@ -456,6 +553,7 @@ function StockSavedModal({ piece, onClose, onPrint }) {
       <p className="wizard-cost-line" style={{ fontSize: "2rem" }}>
         Jobs will pay {money(piece.charge_price)}
       </p>
+      <p className="leftover-callout">After a cut, the remnant stays on {piece.location || "the rack"}.</p>
       <p className="meta">
         What we paid {money(piece.shop_cost)} · markup {percent(piece.markup)}
       </p>

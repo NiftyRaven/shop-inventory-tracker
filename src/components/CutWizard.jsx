@@ -4,6 +4,7 @@ import {
   FORM_LABELS,
   formLabel,
   leftoverInches,
+  leftoverStaysCopy,
   money,
   previewCutCharge,
   qty,
@@ -26,7 +27,7 @@ const FORM_ORDER = [
   "other",
 ];
 
-export default function CutWizard({ startPiece, onClose, onSaved }) {
+export default function CutWizard({ startPiece, onClose, onAddStock, onSaved }) {
   const [floor, setFloor] = useState([]);
   const [error, setError] = useState("");
   const [step, setStep] = useState(startPiece ? 3 : 1);
@@ -52,6 +53,14 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
       })
       .catch((err) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    function onKey(event) {
+      if (event.key === "Escape") onClose?.();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const types = useMemo(() => {
     const forms = FORM_ORDER.filter((id) => floor.some((row) => row.form === id)).map((id) => ({
@@ -125,6 +134,16 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
     }
   }
 
+  const stays = leftoverStaysCopy(piece, form);
+  const canCutNow =
+    Boolean(form.job.trim()) &&
+    (form.action !== "cut" ||
+      (isPlate
+        ? Number(form.leftoverWidth) >= 0 &&
+          Number(form.leftoverLength) >= 0 &&
+          form.leftoverWidth !== "" &&
+          form.leftoverLength !== ""
+        : Number(form.cutLength) > 0));
   const confirmLine = confirmCopy(piece, form, preview);
 
   return (
@@ -136,7 +155,7 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
               <p className="wizard-kicker">Cut</p>
               <h2>Cut for a job</h2>
               <p className="hint" style={{ marginBottom: 0 }}>
-                Type → pick the bar on the rack → job number, then length.
+                Type → pick the bar → job number, then length. Remnant stays on the rack.
               </p>
             </div>
             <button type="button" className="btn btn-ghost" onClick={onClose}>
@@ -166,7 +185,21 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
           />
         ) : step === 1 ? (
           floor.length === 0 ? (
-            <div className="empty">Nothing on the rack yet. Add stock first, then come back to cut.</div>
+            <div className="empty-state">
+              <h3>Nothing on the rack yet.</h3>
+              <p>Add a bar or plate first. Then come back, type the job, and cut. Leftover stays on the rack.</p>
+              <div className="empty-actions">
+                {onAddStock ? (
+                  <button type="button" className="btn btn-primary btn-xl" onClick={onAddStock}>
+                    Add stock
+                  </button>
+                ) : (
+                  <button type="button" className="btn btn-ghost" onClick={onClose}>
+                    Close
+                  </button>
+                )}
+              </div>
+            </div>
           ) : (
             <>
               <h3 className="wizard-section">What shape is it?</h3>
@@ -244,9 +277,10 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
                 <input
                   required
                   autoFocus
+                  autoComplete="off"
                   value={form.job}
                   onChange={(e) => setForm((prev) => ({ ...prev, job: e.target.value }))}
-                  placeholder="Type the job first"
+                  placeholder="Required — charge goes to this job"
                 />
               </label>
               <label className="field wide">
@@ -305,8 +339,11 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
               </label>
             </div>
 
-            {form.job ? (
-              <p className="wizard-cost-line">{confirmLine}</p>
+            {form.job.trim() ? (
+              <>
+                <p className="wizard-cost-line">{confirmLine}</p>
+                {stays ? <p className="leftover-callout">{stays}</p> : null}
+              </>
             ) : (
               <p className="wizard-cost-line dim">Type the job number, then the length.</p>
             )}
@@ -315,7 +352,7 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
               <button type="button" className="btn btn-ghost" onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary btn-xl" disabled={busy}>
+              <button type="submit" className="btn btn-primary btn-xl" disabled={busy || !canCutNow}>
                 {busy ? "Saving…" : "Cut"}
               </button>
             </div>
@@ -346,10 +383,12 @@ function successDetail(piece, form, charge) {
   const rack = `Rack ${rackLetter(piece?.location)}`;
   if (form.action === "fully_used") return `whole piece off ${rack}`;
   if (form.action === "scrap") return `scrap off ${rack}`;
+  const stays = leftoverStaysCopy(piece, form);
   if (piece?.cut_mode === "plate") {
-    return `leftover ${qty(form.leftoverWidth)}" × ${qty(form.leftoverLength)}" on ${rack}`;
+    return stays || `leftover ${qty(form.leftoverWidth)}" × ${qty(form.leftoverLength)}" on ${rack}`;
   }
-  return `${qty(form.cutLength) || charge.taken} in off ${rack}`;
+  const taken = `${qty(form.cutLength) || charge.taken} in off ${rack}`;
+  return stays ? `${taken} · ${stays}` : taken;
 }
 
 function NumPad({ onKey }) {
