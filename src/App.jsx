@@ -117,10 +117,10 @@ export default function App() {
         <aside className="howto">
           <h2>Same screens. Different jobs.</h2>
           <p>
-            <strong>Materials</strong> — cut a bar for a job. Type the job, pick the bar, cut.
+            <strong>Materials</strong> — job number, pick the bar, cut. Remnant stays on the rack.
             {" "}<strong>Inventory</strong> — add bought parts, then take them for a job.
             {" "}<strong>History</strong> / <strong>Costs</strong> — every cut and take, with the time and dollars.
-            {" "}<strong>Settings</strong> — name, logo, password. Starts as <strong>free</strong>.
+            {" "}<strong>Settings</strong> — name, logo, markup (default 30%), password. Starts as <strong>free</strong>.
           </p>
           <p className="meta">After the PC sleeps or restarts, double-click Start Inventory.bat again.</p>
           <div className="howto-actions">
@@ -155,8 +155,15 @@ export default function App() {
           />
         ) : (
           <section className="page">
-            <form className="table-wrap settings-card" onSubmit={unlock} style={{ padding: 22 }}>
-              <h2 style={{ marginTop: 0 }}>Settings</h2>
+            <div className="page-head">
+              <div>
+                <p className="page-kicker">Shop PC</p>
+                <h2>Settings</h2>
+                <p>Name, logo, default markup, and Format. Local to this shop only.</p>
+              </div>
+            </div>
+            <form className="table-wrap settings-card settings-pad" onSubmit={unlock}>
+              <h3 style={{ marginTop: 0 }}>Unlock</h3>
               <p className="hint">
                 Type the shop password, then Unlock. First run is <strong>free</strong>.
               </p>
@@ -173,7 +180,7 @@ export default function App() {
                 />
               </label>
               <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
-                <button type="submit" className="btn btn-primary btn-xl" disabled={unlockBusy}>
+                <button type="submit" className="btn btn-primary btn-xl" disabled={unlockBusy || !unlockInput.trim()}>
                   {unlockBusy ? "Unlocking…" : "Unlock"}
                 </button>
               </div>

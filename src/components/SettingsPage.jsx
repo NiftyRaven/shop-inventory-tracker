@@ -31,22 +31,6 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
       .catch(() => {});
   }, [password]);
 
-  async function submit(event) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    setSaved(false);
-    try {
-      const next = await api.updateShop({ ...form, password });
-      onSaved?.(next);
-      setSaved(true);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function changePw(event) {
     event.preventDefault();
     setBusy(true);
@@ -105,15 +89,42 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
     }
   }
 
+  const markupNum = Number(form.defaultMarkup);
+  const markupOk = Number.isFinite(markupNum) && markupNum >= 0;
+  const exampleCharge = (100 * (1 + (markupOk ? markupNum : 30) / 100)).toFixed(0);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!markupOk) {
+      setError("Default markup must be 0 or more.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setSaved(false);
+    try {
+      const next = await api.updateShop({ ...form, defaultMarkup: markupNum, password });
+      onSaved?.(next);
+      setSaved(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="page">
+      <div className="page-head">
+        <div>
+          <p className="page-kicker">This shop</p>
+          <h2>Settings</h2>
+          <p>Name, logo, default markup, and Format. Stays on this PC — no cloud, no accounts.</p>
+        </div>
+      </div>
       <div className="table-wrap settings-card">
-        <div style={{ padding: 22 }}>
-          <h2 style={{ marginTop: 0 }}>Settings</h2>
+        <div className="settings-pad">
           <p className="this-pc">This PC: {shop?.thisPc?.actor || "unknown"}</p>
-          <p className="hint">
-            Shop name, default markup (percent, 30 if you leave new stock blank), logo, and Format.
-          </p>
           {error ? <p className="error">{error}</p> : null}
           {saved ? <p className="ok-msg">Saved.</p> : null}
           {formatMsg ? <p className="ok-msg" style={{ whiteSpace: "pre-wrap" }}>{formatMsg}</p> : null}
@@ -134,89 +145,102 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
               <label className="field">
                 <span>Default markup (%)</span>
                 <input
+                  inputMode="decimal"
                   value={form.defaultMarkup}
                   onChange={(e) => setForm((p) => ({ ...p, defaultMarkup: e.target.value }))}
                 />
               </label>
             </div>
+            <p className="meta">
+              New stock and parts use this if markup is left blank. Example: $100 stock → jobs pay ${exampleCharge}.
+            </p>
             <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
-              <button type="submit" className="btn btn-primary" disabled={busy}>
-                {busy ? "Saving…" : "Save company"}
+              <button type="submit" className="btn btn-primary" disabled={busy || !markupOk}>
+                {busy ? "Saving…" : "Save shop"}
               </button>
             </div>
           </form>
 
-          <h3 className="cuts-heading">Shop logo</h3>
-          <p className="hint">
-            Pick a picture (PNG with no background looks best). You can also drop a file named{" "}
-            <strong>logo.png</strong> in the program folder.
-          </p>
-          {shop?.logoUrl ? (
-            <img className="settings-logo" src={shop.logoUrl} alt={`${shop.name} logo`} />
-          ) : (
-            <p className="meta">No logo yet.</p>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
-            hidden
-            onChange={onLogo}
-          />
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => fileRef.current?.click()}>
-            Change shop logo
-          </button>
-
-          <h3 className="cuts-heading">How to</h3>
-          <p className="hint" style={{ marginBottom: 0 }}>
-            Materials: type the job, pick the bar, cut. Inventory: add parts, take with a job.
-            History and Costs are the books.
-          </p>
-
-          <h3 className="cuts-heading">Password</h3>
-          {passwordChanged ? (
+          <div className="settings-block">
+            <h3 className="cuts-heading">Shop logo</h3>
             <p className="hint">
-              To change the password again, edit admin-password.txt in the install folder.
+              Pick a picture (PNG with no background looks best). A logo you pick here stays on this PC
+              only. You can also drop a file named <strong>logo.png</strong> in the program folder.
             </p>
-          ) : (
-            <form onSubmit={changePw}>
+            {shop?.logoUrl ? (
+              <img className="settings-logo" src={shop.logoUrl} alt={`${shop.name} logo`} />
+            ) : (
+              <p className="meta">No logo yet.</p>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+              hidden
+              onChange={onLogo}
+            />
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => fileRef.current?.click()}>
+              Change shop logo
+            </button>
+          </div>
+
+          <div className="settings-block">
+            <h3 className="cuts-heading">How to</h3>
+            <p className="hint" style={{ marginBottom: 0 }}>
+              Materials: job number, pick the bar, cut. Remnant stays on the rack. Inventory: add parts, take
+              with a job. History and Costs are the books.
+            </p>
+          </div>
+
+          <div className="settings-block">
+            <h3 className="cuts-heading">Password</h3>
+            {passwordChanged ? (
+              <p className="hint">
+                To change the password again, edit admin-password.txt in the install folder.
+              </p>
+            ) : (
+              <form onSubmit={changePw}>
+                <label className="field">
+                  <span>New password (you can change this once here)</span>
+                  <input
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </label>
+                <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
+                  <button type="submit" className="btn btn-ghost" disabled={busy || !newPassword.trim()}>
+                    Change password
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          <div className="settings-block">
+            <h3 className="cuts-heading">Format — start from scratch</h3>
+            <p className="hint">
+              Saves a zip backup first. Then empties stock, history, and the shop name back to AG Innovation.
+              Password goes back to <strong>free</strong>. Markup goes back to 30%. Factory logo.png stays;
+              a logo you uploaded here is cleared.
+            </p>
+            <form onSubmit={formatShop}>
               <label className="field">
-                <span>New password (you can change this once here)</span>
+                <span>Type the current password to format</span>
                 <input
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  autoComplete="new-password"
+                  type="password"
+                  value={formatPassword}
+                  onChange={(e) => setFormatPassword(e.target.value)}
+                  autoComplete="off"
                 />
               </label>
               <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
-                <button type="submit" className="btn btn-ghost" disabled={busy || !newPassword.trim()}>
-                  Change password
+                <button type="submit" className="btn btn-danger" disabled={busy || !formatPassword}>
+                  Format — start from scratch
                 </button>
               </div>
             </form>
-          )}
-
-          <h3 className="cuts-heading">Format — start from scratch</h3>
-          <p className="hint">
-            Saves a zip backup first. Then empties stock, history, and company name back to AG Innovation.
-            Does not delete logo.png.
-          </p>
-          <form onSubmit={formatShop}>
-            <label className="field">
-              <span>Type the current password to format</span>
-              <input
-                type="password"
-                value={formatPassword}
-                onChange={(e) => setFormatPassword(e.target.value)}
-                autoComplete="off"
-              />
-            </label>
-            <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
-              <button type="submit" className="btn btn-danger" disabled={busy || !formatPassword}>
-                Format — start from scratch
-              </button>
-            </div>
-          </form>
+          </div>
         </div>
       </div>
     </section>

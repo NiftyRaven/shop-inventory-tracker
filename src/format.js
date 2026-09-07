@@ -8,7 +8,7 @@ const FAMILY_LABELS = {
 };
 
 const STATUS_LABELS = {
-  in_stock: "In stock",
+  in_stock: "Full stock",
   remnant: "Remnant",
   used_up: "Used up",
   scrap: "Scrap",
@@ -107,6 +107,23 @@ export function leftoverInches(piece) {
     return `${qty(piece.remaining_width)}" × ${qty(piece.remaining_length)}"`;
   }
   return `${qty(piece.remaining_length)}" left`;
+}
+
+export function leftoverStaysCopy(piece, form) {
+  if (!piece || form?.action !== "cut") return "";
+  const rack = `Rack ${rackLetter(piece.location)}`;
+  if (piece.cut_mode === "plate") {
+    const width = Number(form.leftoverWidth);
+    const length = Number(form.leftoverLength);
+    if (!Number.isFinite(width) || !Number.isFinite(length)) return "";
+    if (width <= 0 || length <= 0) return "Nothing left — piece used up";
+    return `${qty(width)}" × ${qty(length)}" remnant stays on ${rack}`;
+  }
+  const cut = Number(form.cutLength);
+  if (!Number.isFinite(cut) || cut <= 0) return "";
+  const left = Math.max(0, (Number(piece.remaining_length) || 0) - cut);
+  if (left <= 0.0001) return "Nothing left — piece used up";
+  return `${qty(left)}" remnant stays on ${rack}`;
 }
 
 function roundMoney(value) {

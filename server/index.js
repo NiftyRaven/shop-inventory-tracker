@@ -38,7 +38,7 @@ import {
   recordShopEvent,
   wipeInventory,
 } from "./db.js";
-import { findLogo, readShop, resetShopToFactory, writeShop } from "./shop.js";
+import { clearUploadedLogos, findLogo, readShop, resetShopToFactory, writeShop } from "./shop.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
@@ -202,6 +202,7 @@ app.post("/api/admin/format", (req, res) => {
   }
 
   wipeInventory(db);
+  clearUploadedLogos(rootDir);
   const next = resetShopToFactory(rootDir);
   resetAdminToFactory(rootDir);
 

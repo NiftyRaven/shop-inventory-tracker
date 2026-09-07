@@ -40,7 +40,10 @@ admin-password.txt in this folder.
 FORMAT
 ------
 Format empties the tracker and puts the name back to AG Innovation.
-It makes a zip backup first (in the backups folder). logo.png is not deleted.
+Password goes back to free. Markup goes back to 30%.
+It makes a zip backup first (in the backups folder).
+The factory logo.png in this folder is not deleted.
+A logo you uploaded in Settings is cleared.
 
 CHANGE THE LOGO
 ---------------

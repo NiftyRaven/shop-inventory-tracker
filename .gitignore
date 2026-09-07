@@ -1,12 +1,21 @@
+# Dependencies and build output — never ship these
 node_modules/
 dist/
+
+# Runtime shop state — a clone or ZIP download must start empty
 data/
 backups/
 *.db
 *.db-wal
 *.db-shm
+*.db-journal
 *.zip
+
+# Generated on first start / Settings (factory password is "free" in code)
 admin-password.txt
 admin.json
+
 .env
 .DS_Store
+Thumbs.db
+npm-debug.log*

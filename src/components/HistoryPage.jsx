@@ -1,12 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 import { money, qty, when } from "../format.js";
 import { PieceDetail } from "./MaterialsPage.jsx";
+
+const KIND_FILTERS = [
+  { id: "", label: "All" },
+  { id: "cut", label: "Cuts" },
+  { id: "take", label: "Takes" },
+  { id: "receive", label: "Receives" },
+  { id: "stock", label: "Stock" },
+  { id: "removed", label: "Removed" },
+];
 
 export default function HistoryPage({ shop }) {
   const [events, setEvents] = useState([]);
   const [error, setError] = useState("");
   const [detail, setDetail] = useState(null);
+  const [q, setQ] = useState("");
+  const [kind, setKind] = useState("");
 
   useEffect(() => {
     api.history().then(setEvents).catch((err) => setError(err.message));
@@ -17,21 +28,91 @@ export default function HistoryPage({ shop }) {
     setDetail(await api.material(id));
   }
 
+  const visible = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return events.filter((event) => {
+      if (kind === "take" && !(event.kind === "part" && event.type === "issue")) return false;
+      if (kind === "receive" && !(event.kind === "part" && event.type === "receive")) return false;
+      if (kind && kind !== "take" && kind !== "receive" && event.kind !== kind) return false;
+      if (!needle) return true;
+      const hay = [
+        event.job,
+        event.material,
+        event.description,
+        event.part_number,
+        event.note,
+        event.actor,
+        event.kind,
+        event.type,
+        event.leftover_size,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(needle);
+    });
+  }, [events, q, kind]);
+
+  const firstRun = events.length === 0;
+
   return (
     <section className="page">
-      <div className="toolbar">
-        <p className="meta" style={{ margin: 0 }}>
-          Full ledger. Every cut, take, receive, and removal — when, job, what we paid, what the job paid.
-        </p>
+      <div className="page-head">
+        <div>
+          <p className="page-kicker">Books</p>
+          <h2>History</h2>
+          <p>Every cut, take, receive, and removal — when, job, what we paid, what the job paid.</p>
+        </div>
       </div>
+      {firstRun ? null : (
+        <>
+          <div className="toolbar">
+            <input
+              className="search"
+              type="search"
+              placeholder="Search job, material, part, PC…"
+              value={q}
+              onChange={(event) => setQ(event.target.value)}
+            />
+          </div>
+          <div className="type-chips">
+            {KIND_FILTERS.map((item) => (
+              <button
+                key={item.id || "all"}
+                type="button"
+                className={`chip chip-btn${kind === item.id ? " chip-active" : ""}`}
+                onClick={() => setKind(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       {error ? <p className="error">{error}</p> : null}
       <div className="card-list">
-        {events.length === 0 ? (
-          <div className="empty">Nothing recorded yet. Cuts and takes show up here.</div>
+        {visible.length === 0 ? (
+          <div className="empty-state">
+            {firstRun ? (
+              <>
+                <h3>Nothing recorded yet.</h3>
+                <p>
+                  Cuts and takes show up here with the job number, time, shop cost, and what the job was
+                  charged. The rack starts empty — that’s intended.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3>Nothing matches.</h3>
+                <p>Try a job number, or tap All.</p>
+              </>
+            )}
+          </div>
         ) : (
-          events.map((event) => {
+          visible.map((event) => {
             const clickable = event.piece_id && (event.kind === "cut" || event.kind === "removed");
             const Tag = clickable ? "button" : "article";
+            const kindClass = kindClassName(event);
             return (
               <Tag
                 className={`history-item${clickable ? " history-link" : ""}`}
@@ -40,8 +121,9 @@ export default function HistoryPage({ shop }) {
                 onClick={clickable ? () => openPiece(event.piece_id) : undefined}
               >
                 <div className="meta">{when(event.created_at)}</div>
-                <div className="kind">{kindLabel(event.kind, event.type)}</div>
+                <div className={`kind ${kindClass}`}>{kindLabel(event.kind, event.type)}</div>
                 <div>
+                  {event.job ? <div className="history-job">Job {event.job}</div> : null}
                   {event.kind === "cut" || event.kind === "removed" ? (
                     <CutCopy event={event} />
                   ) : event.kind === "part" ? (
@@ -61,6 +143,12 @@ export default function HistoryPage({ shop }) {
       ) : null}
     </section>
   );
+}
+
+function kindClassName(event) {
+  if (event.kind === "part" && event.type === "issue") return "kind-take";
+  if (event.kind === "part" && event.type === "receive") return "kind-receive";
+  return `kind-${event.kind || "event"}`;
 }
 
 function kindLabel(kind, type) {
@@ -87,7 +175,6 @@ function MoneyLine({ event }) {
   if (!event.charged && !event.job && !event.shop_cost_share) return null;
   return (
     <div className="meta">
-      {event.job ? `Job ${event.job} · ` : ""}
       charge {money(event.charged)} · paid {money(event.shop_cost_share)} · markup {money(event.markup_share)}
     </div>
   );
@@ -121,10 +208,10 @@ function CutCopy({ event }) {
           : "cut, leftover updated";
   const leftover = event.cut_length
     ? event.leftover_length != null
-      ? ` · leftover ${qty(event.leftover_length)}"`
+      ? ` · remnant ${qty(event.leftover_length)}" stays on rack`
       : ""
     : event.leftover_width != null && event.leftover_length != null
-      ? ` · leftover ${qty(event.leftover_width)}" × ${qty(event.leftover_length)}"`
+      ? ` · remnant ${qty(event.leftover_width)}" × ${qty(event.leftover_length)}" stays on rack`
       : "";
   return (
     <>
