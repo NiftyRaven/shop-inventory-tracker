@@ -112,8 +112,7 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
           <h2 style={{ marginTop: 0 }}>Settings</h2>
           <p className="this-pc">This PC: {shop?.thisPc?.actor || "unknown"}</p>
           <p className="hint">
-            Shop name, default markup, logo, and Format live here. Markup is a percent. Leave new stock
-            blank and it uses this default (30%).
+            Shop name, default markup (percent, 30 if you leave new stock blank), logo, and Format.
           </p>
           {error ? <p className="error">{error}</p> : null}
           {saved ? <p className="ok-msg">Saved.</p> : null}
@@ -141,7 +140,7 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
               </label>
             </div>
             <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
-              <button className="btn btn-primary" disabled={busy}>
+              <button type="submit" className="btn btn-primary" disabled={busy}>
                 {busy ? "Saving…" : "Save company"}
               </button>
             </div>
@@ -170,7 +169,8 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
 
           <h3 className="cuts-heading">How to</h3>
           <p className="hint" style={{ marginBottom: 0 }}>
-            Shop floor: Material type → pick the bar → Cut. Purchaser: search tags or manufacturer → Take.
+            Materials: type the job, pick the bar, cut. Inventory: add parts, take with a job.
+            History and Costs are the books.
           </p>
 
           <h3 className="cuts-heading">Password</h3>
@@ -189,7 +189,7 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
                 />
               </label>
               <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
-                <button className="btn btn-ghost" disabled={busy || !newPassword.trim()}>
+                <button type="submit" className="btn btn-ghost" disabled={busy || !newPassword.trim()}>
                   Change password
                 </button>
               </div>
@@ -212,7 +212,7 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
               />
             </label>
             <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
-              <button className="btn btn-danger" disabled={busy || !formatPassword}>
+              <button type="submit" className="btn btn-danger" disabled={busy || !formatPassword}>
                 Format — start from scratch
               </button>
             </div>

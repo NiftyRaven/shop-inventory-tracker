@@ -5,6 +5,7 @@ backups/
 *.db
 *.db-wal
 *.db-shm
+*.zip
 admin-password.txt
 admin.json
 .env

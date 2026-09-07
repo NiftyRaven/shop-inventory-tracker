@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
 import {
+  FORM_LABELS,
   familyLabel,
   formLabel,
   money,
@@ -10,11 +11,16 @@ import {
   statusLabel,
   when,
 } from "../format.js";
+import { catalogItem, CUSTOM_MATERIAL, MATERIAL_GROUPS } from "../catalog.js";
 import CutWizard from "./CutWizard.jsx";
 import Modal from "./Modal.jsx";
 import PrintTag from "./PrintTag.jsx";
 
 const RACKS = Array.from({ length: 26 }, (_, i) => `Material Rack ${String.fromCharCode(65 + i)}`);
+const FORM_FILTERS = [
+  { id: "", label: "All types" },
+  ...Object.entries(FORM_LABELS).map(([id, label]) => ({ id, label })),
+];
 
 const EMPTY_MATERIAL = {
   form: "plate",
@@ -35,9 +41,11 @@ export default function MaterialsPage({ shop }) {
   const [pieces, setPieces] = useState([]);
   const [q, setQ] = useState("");
   const [family, setFamily] = useState("");
+  const [formFilter, setFormFilter] = useState("");
   const [status, setStatus] = useState("available");
   const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
+  const [savedStock, setSavedStock] = useState(null);
   const [wizard, setWizard] = useState(null);
   const [detail, setDetail] = useState(null);
   const [removing, setRemoving] = useState(null);
@@ -45,6 +53,7 @@ export default function MaterialsPage({ shop }) {
 
   async function load() {
     const params = { q, family };
+    if (formFilter) params.form = formFilter;
     if (status && status !== "available") params.status = status;
     const rows = await api.materials(params);
     setPieces(
@@ -56,10 +65,10 @@ export default function MaterialsPage({ shop }) {
 
   useEffect(() => {
     load().catch((err) => setError(err.message));
-  }, [q, family, status]);
+  }, [q, family, status, formFilter]);
 
   const groups = useMemo(() => {
-    const order = ["steel", "aluminum", "printed", "other"];
+    const order = ["steel", "stainless", "aluminum", "plastic", "printed", "other"];
     const map = new Map();
     for (const piece of pieces) {
       const key = piece.family || "other";
@@ -84,13 +93,16 @@ export default function MaterialsPage({ shop }) {
     }
   }
 
+  const canCut = (piece) =>
+    piece.status !== "used_up" && piece.status !== "scrap" && piece.status !== "removed";
+
   return (
     <section className="page">
       <div className="toolbar">
-        <button className="btn btn-primary btn-xl" onClick={() => setWizard(true)}>
-          Record a cut
+        <button type="button" className="btn btn-primary btn-xl" onClick={() => setWizard(true)}>
+          Cut
         </button>
-        <button className="btn btn-ghost" onClick={() => setAdding(true)}>
+        <button type="button" className="btn btn-ghost" onClick={() => setAdding(true)}>
           Add stock
         </button>
         <input
@@ -102,12 +114,14 @@ export default function MaterialsPage({ shop }) {
         <select className="filter" value={family} onChange={(event) => setFamily(event.target.value)}>
           <option value="">All families</option>
           <option value="steel">Steel</option>
+          <option value="stainless">Stainless</option>
           <option value="aluminum">Aluminum</option>
+          <option value="plastic">Plastics</option>
           <option value="printed">3D printed</option>
           <option value="other">Other</option>
         </select>
         <select className="filter" value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="available">On the floor</option>
+          <option value="available">On the rack</option>
           <option value="in_stock">Full stock</option>
           <option value="remnant">Remnants</option>
           <option value="used_up">Used up</option>
@@ -116,8 +130,20 @@ export default function MaterialsPage({ shop }) {
           <option value="">Everything</option>
         </select>
       </div>
-      <p className="meta" style={{ marginTop: "-8px" }}>
-        Shop floor: tap Record a cut. Then material type → pick the bar → Cut.
+      <div className="type-chips">
+        {FORM_FILTERS.map((item) => (
+          <button
+            key={item.id || "all"}
+            type="button"
+            className={`chip chip-btn${formFilter === item.id ? " chip-active" : ""}`}
+            onClick={() => setFormFilter(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+      <p className="meta" style={{ marginTop: "-4px" }}>
+        Tap a bar to cut it. Job number first, then length.
       </p>
       {error ? <p className="error">{error}</p> : null}
       {groups.length === 0 ? (
@@ -135,9 +161,13 @@ export default function MaterialsPage({ shop }) {
               {rows.map((piece) => (
                 <article className={`piece family-${piece.family}`} key={piece.id}>
                   <div className="rail" />
-                  <button type="button" className="piece-body piece-link" onClick={() => openDetail(piece)}>
+                  <button
+                    type="button"
+                    className="piece-body piece-link"
+                    onClick={() => (canCut(piece) ? setWizard(piece) : openDetail(piece))}
+                  >
                     <div>
-                      <div className="size">{remainingSummary(piece)}</div>
+                      <div className="size size-huge">{remainingSummary(piece)}</div>
                       <div className="meta">{piece.size_label}</div>
                     </div>
                     <div>
@@ -150,20 +180,14 @@ export default function MaterialsPage({ shop }) {
                     <div>
                       <span className={`badge ${piece.status}`}>{statusLabel(piece.status)}</span>
                       <div className="meta">
-                        {shop?.shortName || "AGI"} · {piece.location || "No rack"}
-                      </div>
-                      <div className="meta">
-                        Cost {money(piece.shop_cost)} · markup {percent(piece.markup)} · charge{" "}
-                        {money(piece.charge_price)}
+                        {piece.location || "No rack"}
                       </div>
                     </div>
                   </button>
                   <div className="piece-actions">
-                    {piece.status === "removed" ? null : (
-                      <button className="btn btn-danger btn-small" onClick={() => setRemoving(piece)}>
-                        Remove
-                      </button>
-                    )}
+                    <button type="button" className="btn btn-ghost btn-small" onClick={() => openDetail(piece)}>
+                      More
+                    </button>
                   </div>
                 </article>
               ))}
@@ -178,7 +202,17 @@ export default function MaterialsPage({ shop }) {
           onSaved={async (pieces) => {
             setAdding(false);
             await load();
-            if (pieces?.[0]) setPrintPiece(pieces[0]);
+            if (pieces?.[0]) setSavedStock(pieces[0]);
+          }}
+        />
+      ) : null}
+      {savedStock ? (
+        <StockSavedModal
+          piece={savedStock}
+          onClose={() => setSavedStock(null)}
+          onPrint={() => {
+            setPrintPiece(savedStock);
+            setSavedStock(null);
           }}
         />
       ) : null}
@@ -219,15 +253,34 @@ export default function MaterialsPage({ shop }) {
 
 function AddMaterialModal({ shop, onClose, onSaved }) {
   const [form, setForm] = useState(EMPTY_MATERIAL);
+  const [customMaterial, setCustomMaterial] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const isPlate = form.form === "plate";
+  const isPlate = form.form === "plate" || form.form === "sheet";
   const defaultPct = shop?.defaultMarkup ?? 30;
   const markupPct = form.markup === "" ? defaultPct : Number(form.markup);
   const charge = (Number(form.shop_cost) || 0) * (1 + (Number.isFinite(markupPct) ? markupPct : defaultPct) / 100);
+  const materialChoice = MATERIAL_GROUPS.some((group) => group.items.some((item) => item.id === form.material))
+    ? form.material
+    : form.material
+      ? CUSTOM_MATERIAL
+      : "";
 
   function set(name, value) {
     setForm((prev) => ({ ...prev, [name]: value }));
+  }
+
+  function pickMaterial(value) {
+    if (value === CUSTOM_MATERIAL) {
+      set("material", customMaterial);
+      return;
+    }
+    const item = catalogItem(value);
+    setForm((prev) => ({
+      ...prev,
+      material: value,
+      form: item?.form || prev.form,
+    }));
   }
 
   async function submit(event) {
@@ -235,7 +288,13 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
     setBusy(true);
     setError("");
     try {
-      const result = await api.addMaterials(form);
+      const material = materialChoice === CUSTOM_MATERIAL ? customMaterial.trim() : form.material;
+      if (!material) {
+        setError("Choose a material, or type one under Other.");
+        setBusy(false);
+        return;
+      }
+      const result = await api.addMaterials({ ...form, material });
       onSaved(result.pieces);
     } catch (err) {
       setError(err.message);
@@ -246,8 +305,8 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
 
   return (
     <Modal
-      title="Add shop stock"
-      hint="Stock belongs to the shop. Enter what the shop paid. Markup is a percent (leave blank for 30%). Jobs are charged cost × (1 + markup%)."
+      title="Add stock"
+      hint="What we paid, then markup. Jobs pay cost + markup (30% if you leave markup blank)."
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -257,29 +316,57 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
             <span>Form</span>
             <select value={form.form} onChange={(e) => set("form", e.target.value)}>
               <option value="plate">Plate</option>
+              <option value="sheet">Sheet</option>
               <option value="square_tube">Square tube</option>
               <option value="rect_tube">Rect tube</option>
+              <option value="round_tube">Round tube</option>
               <option value="angle">Angle</option>
               <option value="extrusion">Extrusion</option>
               <option value="bar">Bar</option>
+              <option value="rod">Rod</option>
               <option value="other">Other</option>
             </select>
           </label>
           <label className="field">
             <span>Material</span>
-            <input
+            <select
               required
-              value={form.material}
-              onChange={(e) => set("material", e.target.value)}
-              placeholder="AL-6061, STL-CRS, AL-T&J…"
-            />
+              value={materialChoice}
+              onChange={(e) => pickMaterial(e.target.value)}
+            >
+              <option value="">Choose material…</option>
+              {MATERIAL_GROUPS.map((group) => (
+                <optgroup key={group.id} label={group.label}>
+                  {group.items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              <option value={CUSTOM_MATERIAL}>Other — type it in</option>
+            </select>
           </label>
+          {materialChoice === CUSTOM_MATERIAL ? (
+            <label className="field wide">
+              <span>Custom material</span>
+              <input
+                required
+                value={customMaterial}
+                onChange={(e) => {
+                  setCustomMaterial(e.target.value);
+                  set("material", e.target.value);
+                }}
+                placeholder="Type the grade or trade name"
+              />
+            </label>
+          ) : null}
           <label className="field wide">
             <span>Description</span>
             <input
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
-              placeholder="80/20 1515 PROFILE, SQ TUBING…"
+              placeholder="SQ TUBING, 1515 profile…"
             />
           </label>
           <label className="field">
@@ -301,7 +388,7 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
             <input value={form.length} onChange={(e) => set("length", e.target.value)} />
           </label>
           <label className="field">
-            <span>Quantity of pieces</span>
+            <span>How many pieces</span>
             <input
               type="number"
               min="1"
@@ -311,7 +398,7 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
             />
           </label>
           <label className="field">
-            <span>Material rack</span>
+            <span>Rack</span>
             <select required value={form.location} onChange={(e) => set("location", e.target.value)}>
               {RACKS.map((rack) => (
                 <option key={rack} value={rack}>
@@ -321,12 +408,12 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
             </select>
           </label>
           <label className="field">
-            <span>Shop cost ($)</span>
+            <span>What we paid ($)</span>
             <input
               required
               value={form.shop_cost}
               onChange={(e) => set("shop_cost", e.target.value)}
-              placeholder="What the shop paid"
+              placeholder="Shop cost for this piece"
             />
           </label>
           <label className="field">
@@ -342,16 +429,44 @@ function AddMaterialModal({ shop, onClose, onSaved }) {
             <input value={form.notes} onChange={(e) => set("notes", e.target.value)} />
           </label>
         </div>
-        <p className="meta">Charge to jobs for the whole piece: {money(charge)}</p>
+        <p className="wizard-cost-line" style={{ fontSize: "1.6rem" }}>
+          Jobs will pay {money(charge)}
+        </p>
+        <p className="meta">What we paid {money(form.shop_cost)} + {percent(Number.isFinite(markupPct) ? markupPct : defaultPct)}</p>
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-primary" disabled={busy}>
+          <button type="submit" className="btn btn-primary" disabled={busy}>
             {busy ? "Saving…" : "Add to rack"}
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+function StockSavedModal({ piece, onClose, onPrint }) {
+  return (
+    <Modal title="On the rack" onClose={onClose}>
+      <p className="meta" style={{ marginTop: 0 }}>
+        {piece.material}
+        {piece.description ? ` · ${piece.description}` : ""} · {remainingSummary(piece)}
+      </p>
+      <p className="wizard-cost-line" style={{ fontSize: "2rem" }}>
+        Jobs will pay {money(piece.charge_price)}
+      </p>
+      <p className="meta">
+        What we paid {money(piece.shop_cost)} · markup {percent(piece.markup)}
+      </p>
+      <div className="modal-actions">
+        <button type="button" className="btn btn-ghost" onClick={onClose}>
+          Done
+        </button>
+        <button type="button" className="btn btn-primary" onClick={onPrint}>
+          Print tag
+        </button>
+      </div>
     </Modal>
   );
 }
@@ -366,11 +481,11 @@ export function PieceDetail({ piece, shop, onClose, onCut, onRemove, onPrint }) 
       onClose={onClose}
     >
       <p className="meta" style={{ marginTop: 0 }}>
-        {piece.size_label} · remaining {remainingSummary(piece)} · markup {percent(piece.markup)}
+        {piece.size_label} · remaining {remainingSummary(piece)}
       </p>
       <div className="stat-grid compact">
         <div className="stat">
-          <div className="meta">Shop paid</div>
+          <div className="meta">What we paid</div>
           <strong>{money(piece.shop_cost)}</strong>
         </div>
         <div className="stat">
@@ -386,7 +501,7 @@ export function PieceDetail({ piece, shop, onClose, onCut, onRemove, onPrint }) 
           <strong>{money(piece.remaining_value)}</strong>
         </div>
       </div>
-      <h3 className="cuts-heading">Cut record</h3>
+      <h3 className="cuts-heading">Piece history</h3>
       {cuts.length === 0 ? (
         <p className="meta">No cuts yet.</p>
       ) : (
@@ -416,9 +531,9 @@ export function PieceDetail({ piece, shop, onClose, onCut, onRemove, onPrint }) 
                   </>
                 ) : (
                   <>
-                    <div>Charge {money(cut.charged)}</div>
+                    <div>Charge to job {money(cut.charged)}</div>
                     <div className="meta">
-                      cost {money(cut.shop_cost_share)} · markup {money(cut.markup_share)}
+                      paid {money(cut.shop_cost_share)} · markup {money(cut.markup_share)}
                     </div>
                   </>
                 )}
@@ -471,7 +586,7 @@ function RemoveConfirm({ piece, onClose, onRemoved }) {
   return (
     <Modal title="Remove from the rack" onClose={onClose}>
       <p className="hint">
-        Remove this piece from the rack? This is saved in History.
+        Take this piece off the rack? History keeps it.
       </p>
       <p className="meta">
         {piece.material}
@@ -482,7 +597,7 @@ function RemoveConfirm({ piece, onClose, onRemoved }) {
         <button type="button" className="btn btn-ghost" onClick={onClose}>
           Keep it
         </button>
-        <button type="button" className="btn btn-danger btn-xl" disabled={busy} onClick={confirm}>
+        <button type="button" className="btn btn-danger" disabled={busy} onClick={confirm}>
           {busy ? "Removing…" : "Yes, remove it"}
         </button>
       </div>

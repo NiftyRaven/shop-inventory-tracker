@@ -43,7 +43,11 @@ export function ensureAdminFiles(rootDir) {
 export function readPassword(rootDir) {
   ensureAdminFiles(rootDir);
   const line = fs.readFileSync(passwordPath(rootDir), "utf8").split(/\r?\n/)[0] || "";
-  return line.trim();
+  return line.trim() || DEFAULT_PASSWORD;
+}
+
+export function passwordsMatch(rootDir, password) {
+  return String(password ?? "").trim() === readPassword(rootDir);
 }
 
 export function readAdminMeta(rootDir) {
@@ -63,10 +67,6 @@ export function writeAdminMeta(rootDir, next) {
   };
   fs.writeFileSync(adminMetaPath(rootDir), `${JSON.stringify(meta, null, 2)}\n`, "utf8");
   return meta;
-}
-
-export function passwordsMatch(rootDir, password) {
-  return String(password ?? "") === readPassword(rootDir);
 }
 
 export function changePasswordOnce(rootDir, currentPassword, nextPassword) {

@@ -21,7 +21,7 @@ export default function HistoryPage({ shop }) {
     <section className="page">
       <div className="toolbar">
         <p className="meta" style={{ margin: 0 }}>
-          Every cut, take, and removal — who did it, the job, and what it cost.
+          Full ledger. Every cut, take, receive, and removal — when, job, what we paid, what the job paid.
         </p>
       </div>
       {error ? <p className="error">{error}</p> : null}
@@ -65,8 +65,9 @@ export default function HistoryPage({ shop }) {
 
 function kindLabel(kind, type) {
   if (kind === "removed") return "Removed";
-  if (kind === "cut") return "Material";
+  if (kind === "cut") return "Cut";
   if (kind === "part") return type === "receive" ? "Receive" : "Take";
+  if (kind === "stock") return "Stock";
   if (kind === "password") return "Password";
   if (kind === "logo") return "Logo";
   if (kind === "settings") return "Settings";
@@ -74,11 +75,20 @@ function kindLabel(kind, type) {
 }
 
 function MoneyLine({ event }) {
-  if (event.type === "receive" || (!event.charged && !event.job)) return null;
+  if (event.type === "receive") {
+    return (
+      <div className="meta">
+        {event.job ? `Job ${event.job} · ` : ""}
+        qty {qty(event.quantity)}
+        {event.shop_cost_share ? ` · paid ${money(event.shop_cost_share)}` : ""}
+      </div>
+    );
+  }
+  if (!event.charged && !event.job && !event.shop_cost_share) return null;
   return (
     <div className="meta">
       {event.job ? `Job ${event.job} · ` : ""}
-      charge {money(event.charged)} · cost {money(event.shop_cost_share)} · markup {money(event.markup_share)}
+      charge {money(event.charged)} · paid {money(event.shop_cost_share)} · markup {money(event.markup_share)}
     </div>
   );
 }
@@ -151,6 +161,22 @@ function PartCopy({ event }) {
 
 function ShopCopy({ event }) {
   const detail = event.detail && typeof event.detail === "object" ? event.detail : {};
+  if (event.kind === "stock") {
+    return (
+      <>
+        <strong>
+          Added {detail.material || "stock"}
+          {detail.quantity > 1 ? ` × ${detail.quantity}` : ""}
+        </strong>
+        <div className="meta">
+          {detail.location || ""}
+          {detail.shop_cost != null ? ` · paid ${money(detail.shop_cost)}` : ""}
+          {detail.charged != null ? ` · jobs pay ${money(detail.charged)}` : ""}
+          {detail.markup != null ? ` · markup ${detail.markup}%` : ""}
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <strong>{event.kind === "logo" ? "Logo changed" : event.kind === "password" ? "Password changed" : "Settings saved"}</strong>

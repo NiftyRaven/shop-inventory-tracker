@@ -17,6 +17,7 @@ import {
 import {
   allocateCut,
   allocateIssue,
+  chargeFromShopCost,
   DEFAULT_MARKUP,
   partUnitCharge,
   RACKS,
@@ -328,6 +329,19 @@ app.post("/api/materials", (req, res) => {
   const pieces = ids.map((id) =>
     decoratePiece(db.prepare("SELECT * FROM material_pieces WHERE id = ?").get(id))
   );
+  const charged = chargeFromShopCost(shopCost, markup);
+  recordShopEvent(db, {
+    kind: "stock",
+    actor: actorLabel(req),
+    detail: {
+      material: payload.material,
+      quantity: pieces.length,
+      shop_cost: shopCost * pieces.length,
+      markup,
+      charged: charged.charged * pieces.length,
+      location,
+    },
+  });
   res.status(201).json({ created: pieces.length, pieces });
 });
 
@@ -587,6 +601,7 @@ app.post("/api/materials/:id/cut", (req, res) => {
       charged: money.charged,
       markup_percent: Number(piece.markup) || 0,
       actor,
+      created_at: stamp,
     },
   });
 });
@@ -642,7 +657,20 @@ app.post("/api/parts", (req, res) => {
   });
 
   const row = db.prepare("SELECT * FROM purchased_parts WHERE id = ?").get(result.lastInsertRowid);
-  res.status(201).json(decoratePart(row));
+  const decorated = decoratePart(row);
+  recordShopEvent(db, {
+    kind: "stock",
+    actor: actorLabel(req),
+    detail: {
+      material: decorated.part_number,
+      quantity: decorated.quantity_on_hand,
+      shop_cost: (Number(decorated.unit_cost) || 0) * (Number(decorated.quantity_on_hand) || 0),
+      markup: decorated.unit_markup,
+      charged: (Number(decorated.unit_charge) || 0) * (Number(decorated.quantity_on_hand) || 0),
+      location: decorated.location,
+    },
+  });
+  res.status(201).json(decorated);
 });
 
 app.patch("/api/parts/:id", (req, res) => {
@@ -709,7 +737,7 @@ function movePart(req, res, type) {
   }
 
   const money = type === "issue" ? allocateIssue(row, quantity) : {
-    shop_cost_share: 0,
+    shop_cost_share: roundMoney((Number(row.unit_cost) || 0) * quantity),
     markup_share: 0,
     charged: 0,
   };
@@ -757,6 +785,7 @@ function movePart(req, res, type) {
           charged: money.charged,
           markup_percent: Number(row.unit_markup) || 0,
           actor,
+          created_at: stamp,
         }
       : null,
   });
@@ -774,57 +803,100 @@ app.get("/api/costs", (_req, res) => {
   const cuts = db.prepare("SELECT * FROM material_cuts").all().filter((row) => row.action !== "removed");
   const parts = db.prepare("SELECT * FROM purchased_parts").all();
   const movements = db.prepare("SELECT * FROM part_movements").all();
+  const weekStart = startOfLocalWeek();
 
   const onRack = pieces.filter((row) => row.status !== "removed" && row.status !== "used_up" && row.status !== "scrap");
-  const materialSpent = roundMoney(pieces.reduce((sum, row) => sum + (Number(row.shop_cost) || 0), 0));
-  const materialRemaining = roundMoney(
+  const leftover = roundMoney(
     onRack.reduce((sum, row) => sum + remainingValue(row).remaining_shop_cost, 0)
   );
-  const materialCharged = roundMoney(cuts.reduce((sum, row) => sum + (Number(row.charged) || 0), 0));
-  const materialProfit = roundMoney(cuts.reduce((sum, row) => sum + (Number(row.markup_share) || 0), 0));
 
-  const partSpentOnHand = roundMoney(
-    parts.reduce((sum, row) => sum + (Number(row.unit_cost) || 0) * (Number(row.quantity_on_hand) || 0), 0)
-  );
-  const partIssues = movements.filter((row) => row.type === "issue");
-  const partCharged = roundMoney(partIssues.reduce((sum, row) => sum + (Number(row.charged) || 0), 0));
-  const partProfit = roundMoney(partIssues.reduce((sum, row) => sum + (Number(row.markup_share) || 0), 0));
+  function since(iso, start) {
+    if (!start) return true;
+    const d = new Date(iso);
+    return !Number.isNaN(d.getTime()) && d >= start;
+  }
 
-  const byJob = new Map();
-  function addJob(job, shopCost, markup, charged) {
-    const key = job || "No job";
-    const current = byJob.get(key) || { job: key, shop_cost: 0, markup: 0, charged: 0 };
-    current.shop_cost = roundMoney(current.shop_cost + shopCost);
-    current.markup = roundMoney(current.markup + markup);
-    current.charged = roundMoney(current.charged + charged);
-    byJob.set(key, current);
+  function block(start) {
+    const cutRows = cuts.filter((row) => since(row.created_at, start));
+    const issues = movements.filter((row) => row.type === "issue" && since(row.created_at, start));
+    const receives = movements.filter((row) => row.type === "receive" && since(row.created_at, start));
+    const newPieces = pieces.filter((row) => since(row.created_at, start));
+
+    const materialSpent = roundMoney(newPieces.reduce((sum, row) => sum + (Number(row.shop_cost) || 0), 0));
+    const partSpent = start
+      ? roundMoney(receives.reduce((sum, row) => sum + (Number(row.shop_cost_share) || 0), 0))
+      : roundMoney(
+          parts.reduce((sum, row) => sum + (Number(row.unit_cost) || 0) * (Number(row.quantity_on_hand) || 0), 0) +
+            issues.reduce((sum, row) => sum + (Number(row.shop_cost_share) || 0), 0)
+        );
+
+    const charged = roundMoney(
+      cutRows.reduce((sum, row) => sum + (Number(row.charged) || 0), 0) +
+        issues.reduce((sum, row) => sum + (Number(row.charged) || 0), 0)
+    );
+    const profit = roundMoney(
+      cutRows.reduce((sum, row) => sum + (Number(row.markup_share) || 0), 0) +
+        issues.reduce((sum, row) => sum + (Number(row.markup_share) || 0), 0)
+    );
+
+    const byJob = new Map();
+    function addJob(job, shopCost, markup, chargedAmt) {
+      const key = job || "No job";
+      const current = byJob.get(key) || { job: key, shop_cost: 0, markup: 0, charged: 0 };
+      current.shop_cost = roundMoney(current.shop_cost + shopCost);
+      current.markup = roundMoney(current.markup + markup);
+      current.charged = roundMoney(current.charged + chargedAmt);
+      byJob.set(key, current);
+    }
+    for (const cut of cutRows) {
+      addJob(cut.job, Number(cut.shop_cost_share) || 0, Number(cut.markup_share) || 0, Number(cut.charged) || 0);
+    }
+    for (const move of issues) {
+      addJob(move.job, Number(move.shop_cost_share) || 0, Number(move.markup_share) || 0, Number(move.charged) || 0);
+    }
+
+    return {
+      spent: roundMoney(materialSpent + partSpent),
+      charged,
+      profit,
+      jobs: [...byJob.values()].sort((a, b) => b.charged - a.charged),
+    };
   }
-  for (const cut of cuts) {
-    addJob(cut.job, Number(cut.shop_cost_share) || 0, Number(cut.markup_share) || 0, Number(cut.charged) || 0);
-  }
-  for (const move of partIssues) {
-    addJob(move.job, Number(move.shop_cost_share) || 0, Number(move.markup_share) || 0, Number(move.charged) || 0);
-  }
+
+  const all = block(null);
+  const week = block(weekStart);
 
   res.json({
+    leftover,
+    all,
+    week,
     material: {
-      spent: materialSpent,
-      remaining_cost: materialRemaining,
-      charged: materialCharged,
-      profit: materialProfit,
+      spent: all.spent,
+      remaining_cost: leftover,
+      charged: all.charged,
+      profit: all.profit,
     },
     purchased: {
-      on_hand_cost: partSpentOnHand,
-      charged: partCharged,
-      profit: partProfit,
+      on_hand_cost: 0,
+      charged: all.charged,
+      profit: all.profit,
     },
     totals: {
-      charged: roundMoney(materialCharged + partCharged),
-      profit: roundMoney(materialProfit + partProfit),
+      charged: all.charged,
+      profit: all.profit,
     },
-    jobs: [...byJob.values()].sort((a, b) => b.charged - a.charged),
+    jobs: all.jobs,
   });
 });
+
+function startOfLocalWeek() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = start.getDay();
+  const mondayOffset = day === 0 ? 6 : day - 1;
+  start.setDate(start.getDate() - mondayOffset);
+  return start;
+}
 
 function isSameLocalDay(iso) {
   if (!iso) return false;
@@ -892,24 +964,24 @@ const distDir = path.join(rootDir, "dist");
 const distIndex = path.join(distDir, "index.html");
 let uiMode = "none";
 
-if (fs.existsSync(distIndex)) {
-  app.use(express.static(distDir));
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api")) return next();
-    res.sendFile(distIndex);
+try {
+  const { createServer: createViteServer } = await import("vite");
+  const vite = await createViteServer({
+    root: rootDir,
+    server: { middlewareMode: true },
+    appType: "spa",
   });
-  uiMode = "static";
-} else {
-  try {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      root: rootDir,
-      server: { middlewareMode: true },
-      appType: "spa",
+  app.use(vite.middlewares);
+  uiMode = "vite";
+} catch {
+  if (fs.existsSync(distIndex)) {
+    app.use(express.static(distDir));
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api")) return next();
+      res.sendFile(distIndex);
     });
-    app.use(vite.middlewares);
-    uiMode = "vite";
-  } catch {
+    uiMode = "static";
+  } else {
     app.get("/", (_req, res) => {
       res.status(200).type("html").send(`<!DOCTYPE html>
 <html><body style="font-family:Segoe UI,sans-serif;padding:2rem;background:#f4efe4">

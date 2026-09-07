@@ -5,7 +5,6 @@ import {
   formLabel,
   leftoverInches,
   money,
-  percent,
   previewCutCharge,
   qty,
   rackLetter,
@@ -14,7 +13,18 @@ import {
 } from "../format.js";
 import SuccessSplash from "./SuccessSplash.jsx";
 
-const FORM_ORDER = ["plate", "square_tube", "rect_tube", "angle", "extrusion", "bar", "other"];
+const FORM_ORDER = [
+  "plate",
+  "sheet",
+  "square_tube",
+  "rect_tube",
+  "round_tube",
+  "angle",
+  "extrusion",
+  "bar",
+  "rod",
+  "other",
+];
 
 export default function CutWizard({ startPiece, onClose, onSaved }) {
   const [floor, setFloor] = useState([]);
@@ -115,16 +125,18 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
     }
   }
 
+  const confirmLine = confirmCopy(piece, form, preview);
+
   return (
     <div className="wizard-overlay">
       <div className="wizard">
         {charge ? null : (
           <div className="wizard-top">
             <div>
-              <p className="wizard-kicker">Shop floor</p>
-              <h2>Record a cut</h2>
+              <p className="wizard-kicker">Cut</p>
+              <h2>Cut for a job</h2>
               <p className="hint" style={{ marginBottom: 0 }}>
-                Three steps: pick the type, tap the bar, enter the cut.
+                Type → pick the bar on the rack → job number, then length.
               </p>
             </div>
             <button type="button" className="btn btn-ghost" onClick={onClose}>
@@ -136,7 +148,7 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
         {charge ? null : (
           <ol className="wizard-steps">
             <li className={step === 1 ? "active" : step > 1 ? "done" : ""}>1. Type</li>
-            <li className={step === 2 ? "active" : step > 2 ? "done" : ""}>2. Piece</li>
+            <li className={step === 2 ? "active" : step > 2 ? "done" : ""}>2. Bar</li>
             <li className={step === 3 ? "active" : ""}>3. Cut</li>
           </ol>
         )}
@@ -149,11 +161,12 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
             amount={charge.charged}
             detail={successDetail(piece, form, charge)}
             actor={charge.actor}
+            at={charge.created_at}
             onDone={onClose}
           />
         ) : step === 1 ? (
           floor.length === 0 ? (
-            <div className="empty">No stock on the floor. Add stock first, then come back to cut.</div>
+            <div className="empty">Nothing on the rack yet. Add stock first, then come back to cut.</div>
           ) : (
             <>
               <h3 className="wizard-section">What shape is it?</h3>
@@ -162,18 +175,18 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
                   <button key={choice.id} type="button" className="choice-btn" onClick={() => pickType(choice)}>
                     <strong>{choice.label}</strong>
                     <span>
-                      {choice.count} {choice.count === 1 ? "piece" : "pieces"} on the floor
+                      {choice.count} {choice.count === 1 ? "bar" : "bars"} on the rack
                     </span>
                   </button>
                 ))}
               </div>
-              <h3 className="wizard-section">Or pick the material grade</h3>
+              <h3 className="wizard-section">Or pick the material</h3>
               <div className="choice-grid">
                 {types.grades.map((choice) => (
                   <button key={choice.id} type="button" className="choice-btn" onClick={() => pickType(choice)}>
                     <strong>{choice.label}</strong>
                     <span>
-                      {choice.count} {choice.count === 1 ? "piece" : "pieces"}
+                      {choice.count} {choice.count === 1 ? "bar" : "bars"}
                     </span>
                   </button>
                 ))}
@@ -191,12 +204,12 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
               </p>
             </div>
             {matches.length === 0 ? (
-              <div className="empty">Nothing of that type is on the floor.</div>
+              <div className="empty">Nothing of that type is on the rack.</div>
             ) : (
               <div className="choice-list">
                 {matches.map((row) => (
                   <button key={row.id} type="button" className="piece-pick" onClick={() => pickPiece(row)}>
-                    <div className="size">{remainingSummary(row)}</div>
+                    <div className="size size-huge">{remainingSummary(row)}</div>
                     <div>
                       <strong>
                         {row.material}
@@ -221,12 +234,21 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
                 </button>
               )}
               <p className="meta" style={{ margin: 0 }}>
-                {piece?.material} · Rack {rackLetter(piece?.location)} · {remainingSummary(piece)} · markup{" "}
-                {percent(piece?.markup)}
+                {piece?.material} · Rack {rackLetter(piece?.location)} · {remainingSummary(piece)}
               </p>
             </div>
 
             <div className="grid">
+              <label className="field wide">
+                <span>Job number</span>
+                <input
+                  required
+                  autoFocus
+                  value={form.job}
+                  onChange={(e) => setForm((prev) => ({ ...prev, job: e.target.value }))}
+                  placeholder="Type the job first"
+                />
+              </label>
               <label className="field wide">
                 <span>What happened</span>
                 <select
@@ -275,15 +297,6 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
               ) : null}
               {form.action === "cut" ? <NumPad onKey={padPress} /> : null}
               <label className="field wide">
-                <span>Job number</span>
-                <input
-                  required
-                  value={form.job}
-                  onChange={(e) => setForm((prev) => ({ ...prev, job: e.target.value }))}
-                  placeholder="Required — type the job"
-                />
-              </label>
-              <label className="field wide">
                 <span>Note (optional)</span>
                 <input
                   value={form.note}
@@ -292,26 +305,18 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
               </label>
             </div>
 
-            {preview && form.job ? (
-              <p className="wizard-cost-line">
-                This cut costs {money(preview.charged)} for Job {form.job}
-              </p>
+            {form.job ? (
+              <p className="wizard-cost-line">{confirmLine}</p>
             ) : (
-              <p className="wizard-cost-line dim">Type the job number to see what this cut costs.</p>
+              <p className="wizard-cost-line dim">Type the job number, then the length.</p>
             )}
-            {preview ? (
-              <p className="meta">
-                Shop cost {money(preview.shop_cost)} + {percent(preview.markup_percent)} markup{" "}
-                {money(preview.markup_share)}
-              </p>
-            ) : null}
 
             <div className="modal-actions">
               <button type="button" className="btn btn-ghost" onClick={onClose}>
                 Cancel
               </button>
-              <button className="btn btn-primary btn-xl" disabled={busy}>
-                {busy ? "Saving…" : "Save this cut"}
+              <button type="submit" className="btn btn-primary btn-xl" disabled={busy}>
+                {busy ? "Saving…" : "Cut"}
               </button>
             </div>
           </form>
@@ -319,6 +324,22 @@ export default function CutWizard({ startPiece, onClose, onSaved }) {
       </div>
     </div>
   );
+}
+
+function confirmCopy(piece, form, preview) {
+  const job = String(form.job || "").trim() || "____";
+  const charge = preview ? money(preview.charged) : "—";
+  return `Job ${job}  ·  Charge to job ${charge}  ·  ${takenCopy(piece, form)}`;
+}
+
+function takenCopy(piece, form) {
+  const rack = `Rack ${rackLetter(piece?.location)}`;
+  if (form.action === "fully_used") return `whole piece off ${rack}`;
+  if (form.action === "scrap") return `scrap off ${rack}`;
+  if (piece?.cut_mode === "plate") {
+    return `leftover ${qty(form.leftoverWidth)}" × ${qty(form.leftoverLength)}" on ${rack}`;
+  }
+  return `${qty(form.cutLength) || "?"} in off ${rack}`;
 }
 
 function successDetail(piece, form, charge) {

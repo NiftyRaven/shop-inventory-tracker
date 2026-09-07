@@ -14,21 +14,23 @@ The tracker starts empty. Add stock and parts yourself.
 After the PC sleeps or restarts, double-click the same file again.
 Leave the black window open while people use the tracker.
 
-HOME SCREEN
------------
-You will see two big tiles:
+ONE APP
+-------
+Same screens for everyone. Tabs at the top:
 
-    Shop floor     — for people at the saw
-    Purchasing     — for people who buy and take parts
+    Materials   — cut a bar for a job
+    Inventory   — bought parts, take for a job
+    History     — every cut and take (time + dollars)
+    Costs       — leftover $, charged, profit
+    Settings    — name, logo, password
 
-Shop floor: Material type → pick the bar → Cut.
-Purchasing: search tags or manufacturer → Take.
-
-The small Admin button is for the trained person only.
+Shop floor: Materials. Tap the bar. Type the job, then the length. Cut.
+Purchaser: Add stock (what we paid + 30% markup). Inventory for hardware.
+Owner: open Costs.
 
 SETTINGS PASSWORD
 -----------------
-Admin password starts as:
+Settings password starts as:
 
     free
 
@@ -42,7 +44,7 @@ It makes a zip backup first (in the backups folder). logo.png is not deleted.
 
 CHANGE THE LOGO
 ---------------
-In Admin → Settings, tap Change shop logo.
+In Settings, tap Change shop logo.
 Or put a picture in this folder named exactly:
 
     logo.png

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { familyForMaterial } from "../src/catalog.js";
 import { DEFAULT_MARKUP, decorateMoney, roundMoney } from "./costing.js";
 import { ensureFactoryShop, readShop, writeShop } from "./shop.js";
 import { createSqlite } from "./sqlite.js";
@@ -9,15 +10,18 @@ const rootDir = path.resolve(__dirname, "..");
 
 export const FORMS = [
   { id: "plate", label: "Plate", cutMode: "plate" },
+  { id: "sheet", label: "Sheet", cutMode: "plate" },
   { id: "square_tube", label: "Square tube", cutMode: "linear" },
   { id: "rect_tube", label: "Rect tube", cutMode: "linear" },
+  { id: "round_tube", label: "Round tube", cutMode: "linear" },
   { id: "angle", label: "Angle", cutMode: "linear" },
   { id: "extrusion", label: "Extrusion", cutMode: "linear" },
   { id: "bar", label: "Bar", cutMode: "linear" },
+  { id: "rod", label: "Rod", cutMode: "linear" },
   { id: "other", label: "Other", cutMode: "linear" },
 ];
 
-export const FAMILIES = ["steel", "aluminum", "printed", "other"];
+export const FAMILIES = ["steel", "stainless", "aluminum", "plastic", "printed", "other"];
 export const STATUSES = ["in_stock", "remnant", "used_up", "scrap", "removed"];
 
 export function cutModeFor(form) {
@@ -25,15 +29,7 @@ export function cutModeFor(form) {
 }
 
 export function inferFamily(material) {
-  const value = String(material || "").toUpperCase();
-  if (value.includes("3D") || value.includes("PRINT")) return "printed";
-  if (value.includes("AL") || value.includes("80/20") || value.includes("6061")) {
-    return "aluminum";
-  }
-  if (value.includes("STL") || value.includes("STEEL") || value.includes("CRS")) {
-    return "steel";
-  }
-  return "other";
+  return familyForMaterial(material);
 }
 
 export function formatDim(value) {
@@ -50,6 +46,15 @@ export function formatSize(piece) {
   const l = formatDim(piece.remaining_length ?? piece.length);
   const form = piece.form;
 
+  if (form === "sheet") {
+    if (t && w && l) return `SHEET "${t}" X "${w}" X "${l}"`;
+  }
+  if (form === "rod") {
+    return `ROD Ø${w || t} X ${l}`;
+  }
+  if (form === "round_tube") {
+    return `RND TUBE Ø${w || h} X ${t} X ${l}`;
+  }
   if (form === "square_tube") {
     return `SQ TUBING ${w} X ${h || w} X ${t}`;
   }
@@ -204,52 +209,6 @@ function migrate(db) {
   addColumn(db, "purchased_parts", "tags", "TEXT");
 }
 
-function backfillCosts(db) {
-  const emptyPieces = db.prepare(
-    "SELECT COUNT(*) AS n FROM material_pieces WHERE IFNULL(shop_cost, 0) = 0"
-  ).get().n;
-  const totalPieces = db.prepare("SELECT COUNT(*) AS n FROM material_pieces").get().n;
-  if (totalPieces && emptyPieces === totalPieces) {
-    const rows = db.prepare("SELECT id, material, form, length FROM material_pieces").all();
-    const update = db.prepare(
-      "UPDATE material_pieces SET shop_cost = @shop_cost, markup = @markup, owner = 'AGI' WHERE id = @id"
-    );
-    for (const row of rows) {
-      const { shop_cost, markup } = defaultPieceMoney(row);
-      update.run({ id: row.id, shop_cost, markup });
-    }
-  }
-
-  const emptyParts = db.prepare(
-    "SELECT COUNT(*) AS n FROM purchased_parts WHERE IFNULL(unit_cost, 0) = 0"
-  ).get().n;
-  const totalParts = db.prepare("SELECT COUNT(*) AS n FROM purchased_parts").get().n;
-  if (totalParts && emptyParts === totalParts) {
-    db.exec(`
-      UPDATE purchased_parts
-      SET unit_cost = ROUND(unit_price / (1 + ${DEFAULT_MARKUP} / 100.0), 2),
-          unit_markup = ${DEFAULT_MARKUP}
-      WHERE IFNULL(unit_cost, 0) = 0
-    `);
-  }
-}
-
-function defaultPieceMoney(row) {
-  const material = String(row.material || "").toUpperCase();
-  const markup = DEFAULT_MARKUP;
-  if (material.includes("WELDMENT")) return { shop_cost: 850, markup };
-  if (material.includes("T&J")) return { shop_cost: 420, markup };
-  if (material.includes("EXTRUSION") || material.includes("80/20")) return { shop_cost: 48, markup };
-  if (material.includes("RECT")) return { shop_cost: 180, markup };
-  if (material.includes("TUBE")) return { shop_cost: row.length >= 200 ? 110 : 70, markup };
-  if (material.includes("ANGLE")) return { shop_cost: 65, markup };
-  if (material.includes("6061")) return { shop_cost: 88, markup };
-  if (material.includes("PRINT")) return { shop_cost: 25, markup };
-  if (material.includes("TELESPAR")) return { shop_cost: 40, markup };
-  if (material.includes("CRS")) return { shop_cost: row.length <= 8 ? 18 : 95, markup };
-  return { shop_cost: 50, markup };
-}
-
 function migrateMarkupToPercent(db) {
   const shop = readShop(rootDir);
   if (shop.markupIsPercent) return;
@@ -293,7 +252,6 @@ export async function openDb() {
   createSchema(db);
   migrate(db);
   seedIfEmpty(db);
-  backfillCosts(db);
   migrateMarkupToPercent(db);
   backfillPartTags(db);
   db.persist();

@@ -213,6 +213,8 @@ button { cursor: pointer; }
   line-height: 1.1;
 }
 
+.size-huge { font-size: clamp(2.1rem, 4vw, 2.8rem); }
+
 .meta { color: var(--muted); font-size: 0.95rem; }
 
 .badge {
@@ -297,7 +299,7 @@ tr.low-stock { background: #2a2416; }
 
 .history-item {
   display: grid;
-  grid-template-columns: 140px 100px 1fr;
+  grid-template-columns: 200px 100px 1fr;
   gap: 12px;
   padding: 16px 18px;
   border-bottom: 1px solid var(--line);
@@ -326,9 +328,29 @@ tr.low-stock { background: #2a2416; }
   border-radius: var(--radius);
   padding: 16px;
 }
-.stat strong {
-  font-family: Consolas, "Cascadia Mono", monospace;
-  font-size: 1.55rem;
+.stat-grid.owner-stats .stat strong {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+}
+
+.chip.chip-active,
+.chip-btn.chip-active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.type-chips,
+.range-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.success-when {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 1.15rem;
 }
 
 .receipt dl { margin: 0; display: grid; gap: 10px; }

@@ -42,21 +42,21 @@ export default function PurchasedPage({ shop }) {
   return (
     <section className="page">
       <div className="toolbar">
-        <button className="btn btn-primary btn-xl" onClick={() => setTaking(true)}>
-          Take from inventory
+        <button type="button" className="btn btn-primary btn-xl" onClick={() => setTaking(true)}>
+          Take
         </button>
-        <button className="btn btn-ghost" onClick={() => setAdding(true)}>
+        <button type="button" className="btn btn-ghost" onClick={() => setAdding(true)}>
           Add part
         </button>
         <input
           className="search"
-          placeholder="Search tags, manufacturer, part number, description…"
+          placeholder="Search tags, manufacturer, part number…"
           value={q}
           onChange={(event) => setQ(event.target.value)}
         />
       </div>
       <p className="meta" style={{ marginTop: "-8px" }}>
-        Purchaser: search tags or manufacturer, then Take. Job number is required.
+        Bought parts. Add them with cost and markup. Take needs a job number.
       </p>
       {error ? <p className="error">{error}</p> : null}
 
@@ -92,9 +92,9 @@ export default function PurchasedPage({ shop }) {
                 <th>Description</th>
                 <th>Manufacturer</th>
                 <th>Tags</th>
-                <th>Shop cost</th>
+                <th>What we paid</th>
                 <th>Markup</th>
-                <th>Charge</th>
+                <th>Jobs pay</th>
                 <th>In stock</th>
                 <th></th>
               </tr>
@@ -143,7 +143,7 @@ export default function PurchasedPage({ shop }) {
       </div>
       {adding ? (
         <PartFormModal
-          title="Add purchased part"
+          title="Add part"
           shop={shop}
           initial={EMPTY_PART}
           onClose={() => setAdding(false)}
@@ -237,7 +237,7 @@ function PartFormModal({ title, shop, initial, hideQty, onClose, onSubmit }) {
   return (
     <Modal
       title={title}
-      hint="Enter what the shop paid. Markup is a percent (leave blank for 30%). Tag parts so people can find them later."
+      hint="What we paid each, then markup. Leave markup blank for 30%. Tag parts so people can find them."
       onClose={onClose}
     >
       <form onSubmit={submit}>
@@ -271,7 +271,7 @@ function PartFormModal({ title, shop, initial, hideQty, onClose, onSubmit }) {
             </div>
           </label>
           <label className="field">
-            <span>Shop cost each ($)</span>
+            <span>What we paid each ($)</span>
             <input required value={form.unit_cost} onChange={(e) => set("unit_cost", e.target.value)} />
           </label>
           <label className="field">
@@ -297,12 +297,17 @@ function PartFormModal({ title, shop, initial, hideQty, onClose, onSubmit }) {
             <input value={form.location} onChange={(e) => set("location", e.target.value)} />
           </label>
         </div>
-        <p className="meta">Charge to a job per piece: {money(charge)}</p>
+        <p className="wizard-cost-line" style={{ fontSize: "1.6rem" }}>
+          Jobs will pay {money(charge)} each
+        </p>
+        <p className="meta">
+          What we paid {money(form.unit_cost)} + {percent(Number.isFinite(markupPct) ? markupPct : defaultPct)}
+        </p>
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-primary" disabled={busy}>
+          <button type="submit" className="btn btn-primary" disabled={busy}>
             {busy ? "Saving…" : "Save part"}
           </button>
         </div>

@@ -1,6 +1,8 @@
 const FAMILY_LABELS = {
   steel: "Steel",
+  stainless: "Stainless",
   aluminum: "Aluminum",
+  plastic: "Plastics",
   printed: "3D printed",
   other: "Other",
 };
@@ -15,11 +17,14 @@ const STATUS_LABELS = {
 
 export const FORM_LABELS = {
   plate: "Plate",
+  sheet: "Sheet",
   square_tube: "Square tube",
   rect_tube: "Rect tube",
+  round_tube: "Round tube",
   angle: "Angle",
   extrusion: "Extrusion",
   bar: "Bar",
+  rod: "Rod",
   other: "Other",
 };
 
@@ -58,6 +63,7 @@ export function when(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleString(undefined, {
+    year: "numeric",
     month: "short",
     day: "numeric",
     hour: "numeric",

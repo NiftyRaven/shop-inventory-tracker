@@ -2,7 +2,7 @@ export const RACKS = Array.from({ length: 26 }, (_, i) => `Material Rack ${Strin
 export const DEFAULT_MARKUP = 30;
 
 function isPlate(piece) {
-  return piece.form === "plate" || piece.cut_mode === "plate";
+  return piece.form === "plate" || piece.form === "sheet" || piece.cut_mode === "plate";
 }
 
 export function roundMoney(value) {

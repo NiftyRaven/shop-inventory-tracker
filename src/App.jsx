@@ -5,19 +5,19 @@ import HistoryPage from "./components/HistoryPage.jsx";
 import MaterialsPage from "./components/MaterialsPage.jsx";
 import PurchasedPage from "./components/PurchasedPage.jsx";
 import SettingsPage from "./components/SettingsPage.jsx";
-import { money, qty, when } from "./format.js";
 
 const HOWTO_KEY = "agi-howto-dismissed";
 const HOWTO_NONCE = "agi-howto-nonce";
-const ADMIN_TABS = [
-  { id: "settings", label: "Settings" },
-  { id: "costs", label: "Costs" },
+const TABS = [
+  { id: "materials", label: "Materials" },
+  { id: "inventory", label: "Inventory" },
   { id: "history", label: "History" },
+  { id: "costs", label: "Costs" },
+  { id: "settings", label: "Settings" },
 ];
 
 export default function App() {
-  const [door, setDoor] = useState("home");
-  const [adminTab, setAdminTab] = useState("settings");
+  const [tab, setTab] = useState("materials");
   const [shop, setShop] = useState({
     name: "AG Innovation",
     shortName: "AGI",
@@ -34,7 +34,7 @@ export default function App() {
   const [adminPassword, setAdminPassword] = useState("");
   const [unlockInput, setUnlockInput] = useState("");
   const [unlockError, setUnlockError] = useState("");
-  const [pulse, setPulse] = useState(null);
+  const [unlockBusy, setUnlockBusy] = useState(false);
 
   useEffect(() => {
     api
@@ -52,12 +52,6 @@ export default function App() {
       })
       .catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (door === "home") {
-      api.pulse().then(setPulse).catch(() => setPulse(null));
-    }
-  }, [door]);
 
   function dismissHowTo() {
     try {
@@ -77,20 +71,19 @@ export default function App() {
   async function unlock(event) {
     event.preventDefault();
     setUnlockError("");
+    setUnlockBusy(true);
+    const password = String(unlockInput || "").trim();
     try {
-      const result = await api.unlock(unlockInput);
-      setAdminPassword(unlockInput);
+      const result = await api.unlock(password);
+      setAdminPassword(password);
       applyShop(result.shop);
       setUnlockInput("");
-      setDoor("admin");
-      setAdminTab("settings");
     } catch (err) {
-      setUnlockError(err.message);
+      setUnlockError(err.message || "Could not unlock. Try free.");
+    } finally {
+      setUnlockBusy(false);
     }
   }
-
-  const title =
-    door === "floor" ? "Shop floor" : door === "purchasing" ? "Purchasing" : door === "admin" ? "Admin" : shop.name;
 
   return (
     <div>
@@ -102,36 +95,32 @@ export default function App() {
             ) : null}
             <div>
               <h1>{shop.name || "AG Innovation"}</h1>
-              <p>{title === shop.name ? `${shop.shortName || "AGI"} shop stock` : title}</p>
+              <p>{shop.shortName || "AGI"} shop stock</p>
             </div>
           </div>
-          {door !== "home" ? (
-            <button type="button" className="btn btn-ghost" onClick={() => setDoor("home")}>
-              Home
-            </button>
-          ) : null}
         </div>
-        {door === "admin" && adminPassword ? (
-          <nav className="nav">
-            {ADMIN_TABS.map((item) => (
-              <button
-                key={item.id}
-                className={adminTab === item.id ? "active" : ""}
-                onClick={() => setAdminTab(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </nav>
-        ) : null}
+        <nav className="nav">
+          {TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={tab === item.id ? "active" : ""}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
       </header>
 
       {showHowTo ? (
         <aside className="howto">
-          <h2>How to use this tracker</h2>
+          <h2>Same screens. Different jobs.</h2>
           <p>
-            First run is empty. Admin (password <strong>free</strong>) sets the shop name and logo.
-            Shop floor: Material type → pick the bar → Cut. Purchaser: search tags or manufacturer → Take.
+            <strong>Materials</strong> — cut a bar for a job. Type the job, pick the bar, cut.
+            {" "}<strong>Inventory</strong> — add bought parts, then take them for a job.
+            {" "}<strong>History</strong> / <strong>Costs</strong> — every cut and take, with the time and dollars.
+            {" "}<strong>Settings</strong> — name, logo, password. Starts as <strong>free</strong>.
           </p>
           <p className="meta">After the PC sleeps or restarts, double-click Start Inventory.bat again.</p>
           <div className="howto-actions">
@@ -142,65 +131,55 @@ export default function App() {
         </aside>
       ) : null}
 
-      {door === "home" ? (
-        <HomeDoors
-          pulse={pulse}
-          onFloor={() => setDoor("floor")}
-          onPurchasing={() => setDoor("purchasing")}
-          onAdmin={() => setDoor("unlock")}
-        />
-      ) : null}
-
-      {door === "unlock" ? (
-        <section className="page">
-          <form className="table-wrap settings-card" onSubmit={unlock} style={{ padding: 22 }}>
-            <h2 style={{ marginTop: 0 }}>Admin</h2>
-            <p className="hint">Settings, costs, and format need the shop password. Default is free.</p>
-            {unlockError ? <p className="error">{unlockError}</p> : null}
-            <label className="field">
-              <span>Password</span>
-              <input
-                type="password"
-                autoFocus
-                value={unlockInput}
-                onChange={(e) => setUnlockInput(e.target.value)}
-              />
-            </label>
-            <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
-              <button type="button" className="btn btn-ghost" onClick={() => setDoor("home")}>
-                Back
-              </button>
-              <button className="btn btn-primary btn-xl">Unlock</button>
-            </div>
-          </form>
-        </section>
-      ) : null}
-
-      {door === "floor" ? <MaterialsPage shop={shop} /> : null}
-      {door === "purchasing" ? <PurchasedPage shop={shop} /> : null}
-      {door === "admin" && adminPassword ? (
-        <>
-          {adminTab === "settings" ? (
-            <SettingsPage
-              shop={shop}
-              password={adminPassword}
-              onSaved={(next) => {
-                if (next?.passwordNow) {
-                  setAdminPassword(next.passwordNow);
-                  return;
-                }
-                applyShop(next);
-              }}
-              onFormatted={(result) => {
-                applyShop(result.shop);
-                setAdminPassword("free");
-                setShowHowTo(true);
-              }}
-            />
-          ) : null}
-          {adminTab === "costs" ? <CostsPage /> : null}
-          {adminTab === "history" ? <HistoryPage shop={shop} /> : null}
-        </>
+      {tab === "materials" ? <MaterialsPage shop={shop} /> : null}
+      {tab === "inventory" ? <PurchasedPage shop={shop} /> : null}
+      {tab === "history" ? <HistoryPage shop={shop} /> : null}
+      {tab === "costs" ? <CostsPage /> : null}
+      {tab === "settings" ? (
+        adminPassword ? (
+          <SettingsPage
+            shop={shop}
+            password={adminPassword}
+            onSaved={(next) => {
+              if (next?.passwordNow) {
+                setAdminPassword(next.passwordNow);
+                return;
+              }
+              applyShop(next);
+            }}
+            onFormatted={(result) => {
+              applyShop(result.shop);
+              setAdminPassword("free");
+              setShowHowTo(true);
+            }}
+          />
+        ) : (
+          <section className="page">
+            <form className="table-wrap settings-card" onSubmit={unlock} style={{ padding: 22 }}>
+              <h2 style={{ marginTop: 0 }}>Settings</h2>
+              <p className="hint">
+                Type the shop password, then Unlock. First run is <strong>free</strong>.
+              </p>
+              {unlockError ? <p className="error">{unlockError}</p> : null}
+              <label className="field">
+                <span>Password</span>
+                <input
+                  type="password"
+                  name="password"
+                  autoFocus
+                  autoComplete="current-password"
+                  value={unlockInput}
+                  onChange={(e) => setUnlockInput(e.target.value)}
+                />
+              </label>
+              <div className="modal-actions" style={{ justifyContent: "flex-start" }}>
+                <button type="submit" className="btn btn-primary btn-xl" disabled={unlockBusy}>
+                  {unlockBusy ? "Unlocking…" : "Unlock"}
+                </button>
+              </div>
+            </form>
+          </section>
+        )
       ) : null}
       <footer className="app-donate">
         <a href="https://x.com/NFTRVN" target="_blank" rel="noreferrer">
@@ -208,64 +187,5 @@ export default function App() {
         </a>
       </footer>
     </div>
-  );
-}
-
-function HomeDoors({ pulse, onFloor, onPurchasing, onAdmin }) {
-  return (
-    <section className="page home-page">
-      <div className="door-grid">
-        <button type="button" className="door-tile floor" onClick={onFloor}>
-          <span className="door-kicker">I work on the floor</span>
-          <strong>Shop floor</strong>
-          <span>Material type → pick the bar → Cut</span>
-        </button>
-        <button type="button" className="door-tile buy" onClick={onPurchasing}>
-          <span className="door-kicker">I take parts for jobs</span>
-          <strong>Purchasing</strong>
-          <span>Search tags or manufacturer → Take</span>
-        </button>
-      </div>
-
-      <div className="pulse">
-        <article className="pulse-stat">
-          <div className="meta">Leftover $ on the rack</div>
-          <strong>{money(pulse?.remaining_cost)}</strong>
-        </article>
-        <article className="pulse-stat">
-          <div className="meta">Charged to jobs today</div>
-          <strong>{money(pulse?.charged_today)}</strong>
-        </article>
-        <article className="pulse-stat">
-          <div className="meta">Low purchased stock</div>
-          <strong>{pulse?.low_stock_count ?? "—"}</strong>
-        </article>
-      </div>
-
-      <div className="pulse-takes">
-        <h2 className="group-title">Last 5 takes</h2>
-        {!pulse?.last_takes?.length ? (
-          <p className="meta">No takes yet.</p>
-        ) : (
-          pulse.last_takes.map((row) => (
-            <div className="take-row" key={row.id}>
-              <strong>{row.part_number}</strong>
-              <span>
-                {qty(row.quantity)}
-                {row.job ? ` · Job ${row.job}` : ""}
-              </span>
-              <span>{money(row.charged)}</span>
-              <span className="meta">{when(row.created_at)}</span>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="home-admin">
-        <button type="button" className="btn btn-ghost" onClick={onAdmin}>
-          Admin
-        </button>
-      </div>
-    </section>
   );
 }

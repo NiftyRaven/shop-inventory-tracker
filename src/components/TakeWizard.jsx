@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
-import { money, parseTagList, percent, previewIssueCharge, qty } from "../format.js";
+import { money, parseTagList, previewIssueCharge, qty } from "../format.js";
 import SuccessSplash from "./SuccessSplash.jsx";
 
 export default function TakeWizard({ onClose, onSaved }) {
@@ -62,10 +62,10 @@ export default function TakeWizard({ onClose, onSaved }) {
         {charge ? null : (
           <div className="wizard-top">
             <div>
-              <p className="wizard-kicker">Purchaser</p>
-              <h2>Take from inventory</h2>
+              <p className="wizard-kicker">Inventory</p>
+              <h2>Take for a job</h2>
               <p className="hint" style={{ marginBottom: 0 }}>
-                Search tags or manufacturer, tap the part, then enter quantity and job.
+                Find the part, type the job, then how many.
               </p>
             </div>
             <button type="button" className="btn btn-ghost" onClick={onClose}>
@@ -89,6 +89,7 @@ export default function TakeWizard({ onClose, onSaved }) {
             amount={charge.charged}
             detail={`${qty(quantity)} × ${part?.part_number || ""}`}
             actor={charge.actor}
+            at={charge.created_at}
             onDone={onClose}
           />
         ) : step === 1 ? (
@@ -96,12 +97,12 @@ export default function TakeWizard({ onClose, onSaved }) {
             <input
               className="search wizard-search"
               autoFocus
-              placeholder="Search tags, manufacturer, part number, or description…"
+              placeholder="Search tags, manufacturer, part number…"
               value={q}
               onChange={(event) => setQ(event.target.value)}
             />
             {matches.length === 0 ? (
-              <div className="empty">No parts match. Try a tag like fastener, 80/20, or pneumatic.</div>
+              <div className="empty">No parts match. Try a tag or manufacturer.</div>
             ) : (
               <div className="choice-list">
                 {matches.map((row) => (
@@ -130,7 +131,7 @@ export default function TakeWizard({ onClose, onSaved }) {
                     </div>
                     <div>
                       <strong>{qty(row.quantity_on_hand)} on hand</strong>
-                      <div className="meta">Charge {money(row.unit_charge)} each</div>
+                      <div className="meta">Charge to job {money(row.unit_charge)} each</div>
                     </div>
                   </button>
                 ))}
@@ -149,22 +150,22 @@ export default function TakeWizard({ onClose, onSaved }) {
               </p>
             </div>
             <div className="grid">
-              <label className="field">
-                <span>How many are you taking?</span>
-                <input
-                  required
-                  autoFocus
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                />
-              </label>
-              <label className="field">
+              <label className="field wide">
                 <span>Job number</span>
                 <input
                   required
+                  autoFocus
                   value={job}
                   onChange={(e) => setJob(e.target.value)}
-                  placeholder="Required"
+                  placeholder="Type the job first"
+                />
+              </label>
+              <label className="field">
+                <span>How many?</span>
+                <input
+                  required
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
                 />
               </label>
               <label className="field wide">
@@ -172,25 +173,19 @@ export default function TakeWizard({ onClose, onSaved }) {
                 <input value={note} onChange={(e) => setNote(e.target.value)} />
               </label>
             </div>
-            {preview && job && quantity ? (
+            {job && quantity ? (
               <p className="wizard-cost-line">
-                This take costs {money(preview.charged)} for Job {job}
+                Job {job}  ·  Charge to job {money(preview?.charged)}  ·  {qty(quantity)} × {part?.part_number}
               </p>
             ) : (
-              <p className="wizard-cost-line dim">Enter quantity and job to see the cost.</p>
+              <p className="wizard-cost-line dim">Type the job, then how many.</p>
             )}
-            {preview ? (
-              <p className="meta">
-                Shop cost {money(preview.shop_cost)} + {percent(preview.markup_percent)} markup{" "}
-                {money(preview.markup_share)}
-              </p>
-            ) : null}
             <div className="modal-actions">
               <button type="button" className="btn btn-ghost" onClick={onClose}>
                 Cancel
               </button>
-              <button className="btn btn-danger btn-xl" disabled={busy}>
-                {busy ? "Saving…" : "Take from inventory"}
+              <button type="submit" className="btn btn-primary btn-xl" disabled={busy}>
+                {busy ? "Saving…" : "Take"}
               </button>
             </div>
           </form>
