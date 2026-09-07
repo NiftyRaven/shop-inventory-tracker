@@ -79,10 +79,26 @@ export function resetShopToFactory(rootDir) {
   });
 }
 
-export function findLogo(rootDir) {
+export function uploadedLogoDir(rootDir) {
+  return path.join(rootDir, "data");
+}
+
+function firstLogoIn(dir) {
   for (const name of LOGO_NAMES) {
-    const file = path.join(rootDir, name);
+    const file = path.join(dir, name);
     if (fs.existsSync(file)) return file;
   }
   return null;
+}
+
+export function findLogo(rootDir) {
+  return firstLogoIn(uploadedLogoDir(rootDir)) || firstLogoIn(rootDir);
+}
+
+export function clearUploadedLogos(rootDir) {
+  const dir = uploadedLogoDir(rootDir);
+  for (const name of LOGO_NAMES) {
+    const file = path.join(dir, name);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
 }

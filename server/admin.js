@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { LOGO_NAMES } from "./shop.js";
+import { LOGO_NAMES, uploadedLogoDir } from "./shop.js";
 
 export const DEFAULT_PASSWORD = "free";
 
@@ -145,6 +145,7 @@ export function createBackupZip(rootDir, { dbPath, shortName, history }) {
     copyIfExists(passwordPath(rootDir), path.join(staging, "admin-password.txt"));
     copyIfExists(adminMetaPath(rootDir), path.join(staging, "admin.json"));
     for (const name of LOGO_NAMES) {
+      copyIfExists(path.join(uploadedLogoDir(rootDir), name), path.join(staging, `uploaded-${name}`));
       copyIfExists(path.join(rootDir, name), path.join(staging, name));
     }
     fs.writeFileSync(
@@ -152,27 +153,49 @@ export function createBackupZip(rootDir, { dbPath, shortName, history }) {
       JSON.stringify(history || [], null, 2)
     );
 
-    const result = spawnSync(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        "-Command",
-        `$ErrorActionPreference = 'Stop'
-$items = @(Get-ChildItem -LiteralPath ${JSON.stringify(staging)} | Select-Object -ExpandProperty FullName)
-if ($items.Count -lt 1) { throw 'Nothing to back up' }
-Compress-Archive -LiteralPath $items -DestinationPath ${JSON.stringify(zipPath)} -Force`,
-      ],
-      { encoding: "utf8", windowsHide: true }
-    );
-
-    if (result.status !== 0 || !fs.existsSync(zipPath)) {
-      const detail = String(result.stderr || result.stdout || "Compress-Archive failed").trim();
-      throw new Error(detail || "Backup zip failed");
+    compressStaging(staging, zipPath);
+    if (!fs.existsSync(zipPath)) {
+      throw new Error("Backup zip failed");
     }
     return zipPath;
   } finally {
     fs.rmSync(staging, { recursive: true, force: true });
   }
+}
+
+function compressStaging(staging, zipPath) {
+  const win = spawnSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-Command",
+      `$ErrorActionPreference = 'Stop'
+$items = @(Get-ChildItem -LiteralPath ${JSON.stringify(staging)} | Select-Object -ExpandProperty FullName)
+if ($items.Count -lt 1) { throw 'Nothing to back up' }
+Compress-Archive -LiteralPath $items -DestinationPath ${JSON.stringify(zipPath)} -Force`,
+    ],
+    { encoding: "utf8", windowsHide: true }
+  );
+  if (win.status === 0 && fs.existsSync(zipPath)) return;
+
+  const zipCli = spawnSync("zip", ["-q", "-r", zipPath, "."], {
+    cwd: staging,
+    encoding: "utf8",
+  });
+  if (zipCli.status === 0 && fs.existsSync(zipPath)) return;
+
+  const py = spawnSync(
+    "python3",
+    ["-c", "import shutil, sys; shutil.make_archive(sys.argv[1][:-4], 'zip', sys.argv[2])", zipPath, staging],
+    { encoding: "utf8" }
+  );
+  if ((py.status === 0 && fs.existsSync(zipPath)) || fs.existsSync(zipPath)) return;
+
+  const detail = [win.stderr, win.stdout, zipCli.stderr, zipCli.stdout, py.stderr, py.stdout]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" / ");
+  throw new Error(detail || "Backup zip failed");
 }
 
 export function saveUploadedLogo(rootDir, { filename, mime, data }) {
@@ -196,11 +219,13 @@ export function saveUploadedLogo(rootDir, { filename, mime, data }) {
   const fromName = path.extname(String(filename || "")).toLowerCase();
   const ext = LOGO_EXT[fromName] || LOGO_EXT[String(mime || "").toLowerCase()] || ".png";
   const destName = `logo${ext}`;
-  const dest = path.join(rootDir, destName);
+  const destDir = uploadedLogoDir(rootDir);
+  fs.mkdirSync(destDir, { recursive: true });
+  const dest = path.join(destDir, destName);
   fs.writeFileSync(dest, buf);
 
   for (const name of LOGO_NAMES) {
-    const other = path.join(rootDir, name);
+    const other = path.join(destDir, name);
     if (path.resolve(other) === path.resolve(dest)) continue;
     if (fs.existsSync(other)) fs.unlinkSync(other);
   }

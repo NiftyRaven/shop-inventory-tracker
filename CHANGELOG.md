@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0 — 2026-09-07
+
+Shop-floor polish plus a clean public download.
+
+- Teaching README: download the ZIP, unzip, double-click **Start Inventory.bat**, first-run empty rack
+- Materials / Inventory / History / Costs empty states that tell you what to do next
+- Cut flow: job number first, leftover stays on the rack, glanceable remnant callouts
+- Uploaded logos live in `data/` on this PC (not shipped). Factory `logo.png` stays in the program folder
+- Format restores a factory shop: empty racks, password `free`, 30% markup, factory logo
+- Runtime files stay gitignored so a clone or ZIP starts empty: `data/`, `backups/`, `*.db`, `admin-password.txt`, `admin.json`
+
 ## 1.0.0 — 2026-09-07
 
 First public release.

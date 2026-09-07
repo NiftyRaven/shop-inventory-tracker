@@ -164,8 +164,8 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
           <div className="settings-block">
             <h3 className="cuts-heading">Shop logo</h3>
             <p className="hint">
-              Pick a picture (PNG with no background looks best). You can also drop a file named{" "}
-              <strong>logo.png</strong> in the program folder.
+              Pick a picture (PNG with no background looks best). A logo you pick here stays on this PC
+              only. You can also drop a file named <strong>logo.png</strong> in the program folder.
             </p>
             {shop?.logoUrl ? (
               <img className="settings-logo" src={shop.logoUrl} alt={`${shop.name} logo`} />
@@ -220,8 +220,9 @@ export default function SettingsPage({ shop, password, onSaved, onFormatted }) {
           <div className="settings-block">
             <h3 className="cuts-heading">Format — start from scratch</h3>
             <p className="hint">
-              Saves a zip backup first. Then empties stock, history, and company name back to AG Innovation.
-              Does not delete logo.png.
+              Saves a zip backup first. Then empties stock, history, and the shop name back to AG Innovation.
+              Password goes back to <strong>free</strong>. Markup goes back to 30%. Factory logo.png stays;
+              a logo you uploaded here is cleared.
             </p>
             <form onSubmit={formatShop}>
               <label className="field">
