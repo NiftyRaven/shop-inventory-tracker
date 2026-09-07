@@ -122,7 +122,7 @@ export default function MaterialsPage({ shop }) {
       {error ? <p className="error">{error}</p> : null}
       {groups.length === 0 ? (
         <div className="card-list">
-          <div className="empty">No material matches. Add a plate, bar, or tube to get started.</div>
+          <div className="empty">Nothing on the rack yet. Tap Add stock to begin.</div>
         </div>
       ) : (
         groups.map(([key, rows]) => (

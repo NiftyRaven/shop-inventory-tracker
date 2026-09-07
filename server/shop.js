@@ -6,9 +6,9 @@ export const DEFAULTS = {
   name: "AG Innovation",
   shortName: "AGI",
   defaultMarkup: DEFAULT_MARKUP,
-  skipSeed: false,
+  skipSeed: true,
   howtoNonce: null,
-  markupIsPercent: false,
+  markupIsPercent: true,
 };
 
 export const LOGO_NAMES = ["logo.png", "logo.jpg", "logo.jpeg", "logo.svg", "logo.webp", "logo.gif"];
@@ -53,6 +53,19 @@ export function writeShop(rootDir, next) {
   fs.mkdirSync(path.dirname(shopFilePath(rootDir)), { recursive: true });
   fs.writeFileSync(shopFilePath(rootDir), JSON.stringify(shop, null, 2));
   return shop;
+}
+
+export function ensureFactoryShop(rootDir) {
+  const file = shopFilePath(rootDir);
+  if (fs.existsSync(file)) return readShop(rootDir);
+  return writeShop(rootDir, {
+    name: DEFAULTS.name,
+    shortName: DEFAULTS.shortName,
+    defaultMarkup: DEFAULT_MARKUP,
+    skipSeed: true,
+    howtoNonce: null,
+    markupIsPercent: true,
+  });
 }
 
 export function resetShopToFactory(rootDir) {

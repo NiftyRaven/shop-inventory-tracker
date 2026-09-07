@@ -20,7 +20,7 @@ That’s shop cost of the portion plus **30% markup**. Can’t miss it. Done.
 
 Home also shows a shop pulse: leftover dollars on the rack, charged to jobs today, how many purchased items are low, last five takes. The owner walks up, sees the day, and goes back to work.
 
-Admin is a small lock. Password starts as `free`. Settings, costs, history, format, logo. The floor kid never has to see it.
+Admin is a small lock. Password starts as `free`. First run is an **empty shop** — set the company name and logo, then add stock. Costs show what you paid, what jobs were charged (cost + 30% markup), leftover rack value, and profit.
 
 ## How to run
 

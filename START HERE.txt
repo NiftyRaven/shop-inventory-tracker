@@ -10,6 +10,7 @@ Double-click:
     Start Inventory.bat
 
 Wait. The first time can take a minute. A browser window should open.
+The tracker starts empty. Add stock and parts yourself.
 After the PC sleeps or restarts, double-click the same file again.
 Leave the black window open while people use the tracker.
 

@@ -130,6 +130,7 @@ export default function App() {
         <aside className="howto">
           <h2>How to use this tracker</h2>
           <p>
+            First run is empty. Admin (password <strong>free</strong>) sets the shop name and logo.
             Shop floor: Material type → pick the bar → Cut. Purchaser: search tags or manufacturer → Take.
           </p>
           <p className="meta">After the PC sleeps or restarts, double-click Start Inventory.bat again.</p>

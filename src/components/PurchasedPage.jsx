@@ -83,7 +83,7 @@ export default function PurchasedPage({ shop }) {
 
       <div className="table-wrap">
         {parts.length === 0 ? (
-          <div className="empty">No purchased parts yet. Add fasteners, fittings, or bought-out items.</div>
+          <div className="empty">No purchased parts yet. Tap Add part to begin.</div>
         ) : (
           <table>
             <thead>
