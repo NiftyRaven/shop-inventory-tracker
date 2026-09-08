@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
-import { money, qty, when } from "../format.js";
+import { money, qty } from "../format.js";
 import { PieceDetail } from "./MaterialsPage.jsx";
 
 const KIND_FILTERS = [
@@ -53,6 +53,7 @@ export default function HistoryPage({ shop }) {
     });
   }, [events, q, kind]);
 
+  const days = useMemo(() => groupByLocalDay(visible), [visible]);
   const firstRun = events.length === 0;
 
   return (
@@ -90,8 +91,8 @@ export default function HistoryPage({ shop }) {
         </>
       )}
       {error ? <p className="error">{error}</p> : null}
-      <div className="card-list">
-        {visible.length === 0 ? (
+      {visible.length === 0 ? (
+        <div className="card-list">
           <div className="empty-state">
             {firstRun ? (
               <>
@@ -108,41 +109,119 @@ export default function HistoryPage({ shop }) {
               </>
             )}
           </div>
-        ) : (
-          visible.map((event) => {
-            const clickable = event.piece_id && (event.kind === "cut" || event.kind === "removed");
-            const Tag = clickable ? "button" : "article";
-            const kindClass = kindClassName(event);
-            return (
-              <Tag
-                className={`history-item${clickable ? " history-link" : ""}`}
-                key={`${event.kind}-${event.id}`}
-                type={clickable ? "button" : undefined}
-                onClick={clickable ? () => openPiece(event.piece_id) : undefined}
-              >
-                <div className="meta">{when(event.created_at)}</div>
-                <div className={`kind ${kindClass}`}>{kindLabel(event.kind, event.type)}</div>
-                <div>
-                  {event.job ? <div className="history-job">Job {event.job}</div> : null}
-                  {event.kind === "cut" || event.kind === "removed" ? (
-                    <CutCopy event={event} />
-                  ) : event.kind === "part" ? (
-                    <PartCopy event={event} />
-                  ) : (
-                    <ShopCopy event={event} />
-                  )}
-                  {event.actor ? <div className="meta">{event.actor}</div> : null}
-                </div>
-              </Tag>
-            );
-          })
-        )}
-      </div>
+        </div>
+      ) : (
+        days.map(([key, rows]) => {
+          const heading = dayHeading(key);
+          return (
+            <section className="history-day" key={key}>
+              <h3 className="history-day-title">
+                <span>{heading.title}</span>
+                {heading.sub ? <span className="meta">{heading.sub}</span> : null}
+                <span className="history-day-count">{rows.length}</span>
+              </h3>
+              <div className="card-list">
+                {rows.map((event) => {
+                  const clickable = event.piece_id && (event.kind === "cut" || event.kind === "removed");
+                  const Tag = clickable ? "button" : "article";
+                  const kindClass = kindClassName(event);
+                  return (
+                    <Tag
+                      className={`history-item${clickable ? " history-link" : ""}`}
+                      key={`${event.kind}-${event.id}`}
+                      type={clickable ? "button" : undefined}
+                      onClick={clickable ? () => openPiece(event.piece_id) : undefined}
+                    >
+                      <div className="history-when">{clock(event.created_at)}</div>
+                      <div className={`kind ${kindClass}`}>{kindLabel(event.kind, event.type)}</div>
+                      <div className="history-body">
+                        <div className="history-job">{leadTitle(event)}</div>
+                        <MoneyLine event={event} />
+                        {event.kind === "cut" || event.kind === "removed" ? (
+                          <CutCopy event={event} />
+                        ) : event.kind === "part" ? (
+                          <PartCopy event={event} />
+                        ) : (
+                          <ShopCopy event={event} />
+                        )}
+                        {event.actor ? <div className="meta">{event.actor}</div> : null}
+                      </div>
+                    </Tag>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })
+      )}
       {detail ? (
         <PieceDetail piece={detail} shop={shop} onClose={() => setDetail(null)} />
       ) : null}
     </section>
   );
+}
+
+function localDayKey(iso) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function groupByLocalDay(events) {
+  const buckets = new Map();
+  for (const event of events) {
+    const key = localDayKey(event.created_at);
+    const list = buckets.get(key);
+    if (list) list.push(event);
+    else buckets.set(key, [event]);
+  }
+  return [...buckets.entries()];
+}
+
+function dayHeading(key) {
+  if (key === "unknown") return { title: "Unknown date", sub: null };
+  const [y, m, d] = key.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.round((today - date) / 86400000);
+  const weekdayDate = date.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    ...(date.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}),
+  });
+  if (diff === 0) return { title: "Today", sub: weekdayDate };
+  if (diff === 1) return { title: "Yesterday", sub: weekdayDate };
+  return { title: weekdayDate, sub: null };
+}
+
+function clock(iso) {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+function leadTitle(event) {
+  if (event.job) return `Job ${event.job}`;
+  if (event.kind === "cut" || event.kind === "removed") {
+    return [event.material, event.description].filter(Boolean).join(" · ") || "Cut";
+  }
+  if (event.kind === "part") {
+    return [event.part_number, event.description].filter(Boolean).join(" · ") || "Part";
+  }
+  if (event.kind === "stock") {
+    const detail = event.detail && typeof event.detail === "object" ? event.detail : {};
+    const qtyBit = detail.quantity > 1 ? ` × ${detail.quantity}` : "";
+    return `Added ${detail.material || "stock"}${qtyBit}`;
+  }
+  if (event.kind === "logo") return "Logo changed";
+  if (event.kind === "password") return "Password changed";
+  return "Settings saved";
 }
 
 function kindClassName(event) {
@@ -163,37 +242,54 @@ function kindLabel(kind, type) {
 }
 
 function MoneyLine({ event }) {
-  if (event.type === "receive") {
+  if (event.kind === "removed" || event.action === "removed") {
+    if (!hasAmount(event.remaining_cost) && !hasAmount(event.charged_to_date)) return null;
     return (
-      <div className="meta">
-        {event.job ? `Job ${event.job} · ` : ""}
-        qty {qty(event.quantity)}
-        {event.shop_cost_share ? ` · paid ${money(event.shop_cost_share)}` : ""}
+      <div className="history-money">
+        leftover {money(event.remaining_cost)} · charged so far {money(event.charged_to_date)}
       </div>
     );
   }
-  if (!event.charged && !event.job && !event.shop_cost_share) return null;
+  if (event.kind === "stock") {
+    const detail = event.detail && typeof event.detail === "object" ? event.detail : {};
+    const bits = [];
+    if (hasAmount(detail.shop_cost)) bits.push(`paid ${money(detail.shop_cost)}`);
+    if (hasAmount(detail.charged)) bits.push(`jobs pay ${money(detail.charged)}`);
+    if (detail.markup != null && detail.markup !== "") bits.push(`markup ${detail.markup}%`);
+    if (!bits.length) return null;
+    return <div className="history-money">{bits.join(" · ")}</div>;
+  }
+  if (event.type === "receive") {
+    return (
+      <div className="history-money">
+        qty {qty(event.quantity)}
+        {hasAmount(event.shop_cost_share) ? ` · paid ${money(event.shop_cost_share)}` : ""}
+      </div>
+    );
+  }
+  if (!hasAmount(event.charged) && !hasAmount(event.shop_cost_share) && !hasAmount(event.markup_share)) {
+    return null;
+  }
   return (
-    <div className="meta">
+    <div className="history-money">
       charge {money(event.charged)} · paid {money(event.shop_cost_share)} · markup {money(event.markup_share)}
     </div>
   );
 }
 
+function hasAmount(value) {
+  return value != null && value !== "" && Number.isFinite(Number(value));
+}
+
 function CutCopy({ event }) {
+  const title = [event.material, event.description].filter(Boolean).join(" · ");
   if (event.kind === "removed" || event.action === "removed") {
     return (
       <>
-        <strong>
-          {event.material}
-          {event.description ? ` · ${event.description}` : ""}
-        </strong>
+        {event.job && title ? <div className="history-detail">{title}</div> : null}
         <div className="meta">
           #{event.piece_id} removed
           {event.leftover_size ? ` · leftover ${event.leftover_size}` : ""}
-        </div>
-        <div className="meta">
-          leftover shop cost {money(event.remaining_cost)} · charged so far {money(event.charged_to_date)}
         </div>
       </>
     );
@@ -215,33 +311,26 @@ function CutCopy({ event }) {
       : "";
   return (
     <>
-      <strong>
-        {event.material}
-        {event.description ? ` · ${event.description}` : ""}
-      </strong>
+      {event.job && title ? <div className="history-detail">{title}</div> : null}
       <div className="meta">
         #{event.piece_id} {action}
         {leftover}
         {event.note ? ` · ${event.note}` : ""}
       </div>
-      <MoneyLine event={event} />
     </>
   );
 }
 
 function PartCopy({ event }) {
+  const title = [event.part_number, event.description].filter(Boolean).join(" · ");
   return (
     <>
-      <strong>
-        {event.part_number}
-        {event.description ? ` · ${event.description}` : ""}
-      </strong>
+      {event.job && title ? <div className="history-detail">{title}</div> : null}
       <div className="meta">
         {event.type === "issue" ? "take" : event.type} {qty(event.quantity)}
         {event.supplier ? ` · ${event.supplier}` : ""}
         {event.note ? ` · ${event.note}` : ""}
       </div>
-      <MoneyLine event={event} />
     </>
   );
 }
@@ -249,28 +338,10 @@ function PartCopy({ event }) {
 function ShopCopy({ event }) {
   const detail = event.detail && typeof event.detail === "object" ? event.detail : {};
   if (event.kind === "stock") {
-    return (
-      <>
-        <strong>
-          Added {detail.material || "stock"}
-          {detail.quantity > 1 ? ` × ${detail.quantity}` : ""}
-        </strong>
-        <div className="meta">
-          {detail.location || ""}
-          {detail.shop_cost != null ? ` · paid ${money(detail.shop_cost)}` : ""}
-          {detail.charged != null ? ` · jobs pay ${money(detail.charged)}` : ""}
-          {detail.markup != null ? ` · markup ${detail.markup}%` : ""}
-        </div>
-      </>
-    );
+    return detail.location ? <div className="meta">{detail.location}</div> : null;
   }
-  return (
-    <>
-      <strong>{event.kind === "logo" ? "Logo changed" : event.kind === "password" ? "Password changed" : "Settings saved"}</strong>
-      <div className="meta">
-        {detail.name || detail.file || ""}
-        {detail.defaultMarkup != null ? ` · markup ${detail.defaultMarkup}%` : ""}
-      </div>
-    </>
-  );
+  const note = [detail.name, detail.file, detail.defaultMarkup != null ? `markup ${detail.defaultMarkup}%` : ""]
+    .filter(Boolean)
+    .join(" · ");
+  return note ? <div className="meta">{note}</div> : null;
 }
