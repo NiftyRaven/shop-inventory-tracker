@@ -387,21 +387,81 @@ tr.low-stock { background: #2a2416; }
   flex-wrap: wrap;
 }
 
+.history-day { margin-bottom: 20px; }
+.history-day:last-child { margin-bottom: 0; }
+
+.history-day-title {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0;
+  padding: 8px 2px 10px;
+  background: var(--bg);
+  font-size: 1.12rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.history-day-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .history-item {
   display: grid;
-  grid-template-columns: 188px 110px 1fr;
-  gap: 12px;
+  grid-template-columns: 88px 100px minmax(0, 1fr);
+  gap: 12px 14px;
   padding: 16px 18px;
   border-bottom: 1px solid var(--line);
   align-items: start;
 }
 .history-item:last-child { border-bottom: 0; }
 
+.history-when {
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  padding-top: 5px;
+}
+
+.history-item .kind { padding-top: 6px; }
+
 .history-job {
   font-size: 1.18rem;
   font-weight: 800;
   letter-spacing: 0.02em;
   margin-bottom: 4px;
+}
+
+.history-item .history-job {
+  font-size: 1.32rem;
+  line-height: 1.15;
+  margin-bottom: 2px;
+}
+
+.history-money {
+  font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+  font-size: 1.08rem;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 2px 0 6px;
+}
+
+.history-detail {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 2px;
 }
 
 .kind {
@@ -898,7 +958,10 @@ tr.low-stock { background: #2a2416; }
   .piece, .piece-body { display: block; }
   .rail { height: 6px; }
   .piece-actions { padding: 0 14px 14px; }
-  .history-item, .grid, .stat-grid, .cut-row, .door-grid, .pulse, .take-row, .low-card { grid-template-columns: 1fr; }
+  .history-item { grid-template-columns: auto 1fr; }
+  .history-body { grid-column: 1 / -1; }
+  .history-item .kind { padding-top: 5px; }
+  .grid, .stat-grid, .cut-row, .door-grid, .pulse, .take-row, .low-card { grid-template-columns: 1fr; }
   .size { font-size: 1.55rem; }
   .page-head h2 { font-size: 1.25rem; }
   .nav button { padding: 0 12px; font-size: 0.98rem; }
